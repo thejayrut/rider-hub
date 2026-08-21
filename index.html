@@ -1,43 +1,14 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#08090a">
-<meta name="description" content="Rider Hub — personal motorcycle operating system">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="styles.css">
-<link rel="stylesheet" href="phase2e-restore.css">
-<title>Rider Hub — Charcoal Ember</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#08090a" />
+  <meta name="description" content="Rider Hub — motorcycle operating system" />
+  <title>Rider Hub — Phase 3</title>
 </head>
 <body>
-<div class="topo"></div>
-<div class="shell">
-<header class="header">
-  <div class="brand"><div class="brandmark">RH</div><div><div class="brandname">RIDER <em>HUB</em></div><div class="sub">CHARCOAL EMBER</div></div></div>
-  <div class="header-actions"><button id="undoBtn" class="round" onclick="undo()" title="Undo">↶</button><button class="round" onclick="openNotifications()" title="Notifications">!</button></div>
-</header>
-<main>
-  <section id="home" class="page active"></section>
-  <section id="bike" class="page"></section>
-  <section id="rides" class="page"></section>
-  <section id="gear" class="page"></section>
-  <section id="docs" class="page"></section>
-</main>
-</div>
-<nav id="nav" class="bottomnav">
-  <button class="navbtn active" data-page="home"><b>⌂</b>Home</button>
-  <button class="navbtn" data-page="bike"><b>◇</b>Bike</button>
-  <button class="ridebtn" data-page="rides" onclick="setPage('rides')">↗</button>
-  <button class="navbtn" data-page="gear"><b>▣</b>Gear</button>
-  <button class="navbtn" data-page="docs"><b>▤</b>Docs</button>
-</nav>
-<div id="modalWrap" class="modalwrap"><div id="modal" class="modal"></div></div>
-<div id="rideMode" class="rideMode"><div id="rideModeInner" class="rideModeInner"></div></div>
-<div id="toast" class="toast"></div>
-<input id="importFile" type="file" accept="application/json" hidden>
-<script src="app.js"></script>
-<script src="enhancements.js"></script>
-<script src="phase2e-restore.js"></script>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>
