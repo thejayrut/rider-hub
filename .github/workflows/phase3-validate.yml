@@ -2,6 +2,8 @@ name: Validate Phase 3
 on:
   push:
     branches: [ phase3 ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 jobs:
   build:
