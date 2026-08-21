@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRiderHub } from '../store/RiderHubProvider'
 import { deletePrivateDoc, getPrivateDoc, openPrivateDoc, savePrivateDoc } from '../services/privateDocs'
 import { Modal, ModalHead } from './Modal'
@@ -17,4 +17,4 @@ export function DocumentsPage(){
   </>
 }
 
-function PrivateStatus({id}:{id:string}){const [name,setName]=useState('Checking…');useState(()=>{getPrivateDoc(id).then(f=>setName(f?`Attached: ${f.name}`:'No file attached yet')).catch(()=>setName('Could not read private storage'))});return <div className="caption" style={{marginTop:10}}>{name}</div>}
+function PrivateStatus({id}:{id:string}){const [name,setName]=useState('Checking…');useEffect(()=>{let active=true;getPrivateDoc(id).then(f=>{if(active)setName(f?`Attached: ${f.name}`:'No file attached yet')}).catch(()=>{if(active)setName('Could not read private storage')});return()=>{active=false}},[id]);return <div className="caption" style={{marginTop:10}}>{name}</div>}
