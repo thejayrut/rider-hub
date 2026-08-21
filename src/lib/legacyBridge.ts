@@ -1,67 +1,67 @@
-import type { GearItem, RiderHubState, Ride, RideDay, RideTask } from '../types'
+import { DEFAULT_GEAR, DEFAULT_STATE } from '../domain/defaultData'
+import type { GearItem, RiderHubState, RideTaskStatus } from '../types'
 
-const LEGACY_KEY = 'riderhub_v6'
+const LEGACY_KEYS=['riderhub_v6','riderhub_phase2d_v1','riderhub_phase2c_v1','riderhub_phase2b_v1']
+const clone=<T,>(x:T):T=>JSON.parse(JSON.stringify(x)) as T
 
-const fallbackRide: Ride = {
-  id: 'ride_banswara_2026',
-  name: 'Banswara 3-Day Ronin Adventure',
-  status: 'planned',
-  startDate: '2026-08-28',
-  endDate: '2026-08-30',
-  route: 'Ahmedabad → Banswara → Ahmedabad',
-  riders: 2,
-  offlineReady: true,
-  touringKm: 0,
-  days: []
+function normalizeGear(source:any):GearItem[]{
+  const raw=Array.isArray(source)?source:Array.isArray(source?.items)?source.items:[]
+  if(!raw.length)return clone(DEFAULT_GEAR)
+  const oldWasSimplified=raw.length<20&&raw.some((x:any)=>/^g\d+$/.test(String(x.id??'')))
+  if(oldWasSimplified)return clone(DEFAULT_GEAR)
+  const defaults=new Map(DEFAULT_GEAR.map(x=>[x.id,clone(x)]))
+  for(const x of raw){
+    const id=String(x.id??crypto.randomUUID())
+    const base=defaults.get(id)
+    const category=(x.category??base?.category??'Riding Gear') as GearItem['category']
+    const owner=(x.owner??base?.owner??'Jayrut') as GearItem['owner']
+    defaults.set(id,{...(base??{} as GearItem),id,name:String(x.name??base?.name??'Gear item'),category,owner,status:x.status==='planned'?'planned':'owned',amount:x.amount==null?base?.amount??null:Number(x.amount),qty:Math.max(1,Number(x.qty??base?.qty??1)),purchaseDate:x.purchaseDate??base?.purchaseDate??'',note:x.note??base?.note??''})
+  }
+  return [...defaults.values()]
 }
 
-export function loadLegacyState(): RiderHubState {
-  const fallback: RiderHubState = {
-    bike: { id: 'bike_ronin_2026', manufacturer: 'TVS', model: 'Ronin', variant: 'Mid', colour: 'Charcoal Ember', year: 2026, currentOdometer: 3200, braking: 'Dual-Channel ABS' },
-    gear: [],
-    rides: [fallbackRide]
-  }
+export function loadLegacyState():RiderHubState{
+  const next=clone(DEFAULT_STATE)
+  try{
+    let legacy:any=null
+    for(const key of LEGACY_KEYS){const raw=localStorage.getItem(key);if(raw){legacy=JSON.parse(raw);break}}
+    if(!legacy)return next
 
-  try {
-    const raw = localStorage.getItem(LEGACY_KEY)
-    if (!raw) return fallback
-    const legacy = JSON.parse(raw) as any
-    const gearSource = Array.isArray(legacy.gear) ? legacy.gear : Array.isArray(legacy.gear?.items) ? legacy.gear.items : []
-    const gear: GearItem[] = gearSource.map((x: any) => ({
-      id: String(x.id ?? crypto.randomUUID()),
-      name: String(x.name ?? 'Gear item'),
-      category: x.category ?? 'Riding Gear',
-      owner: x.owner ?? 'Jayrut',
-      status: x.status === 'planned' ? 'planned' : 'owned',
-      amount: x.amount == null ? null : Number(x.amount),
-      qty: Math.max(1, Number(x.qty ?? 1)),
-      purchaseDate: x.purchaseDate || '',
-      note: x.note || ''
-    }))
+    next.bike.manufacturer=legacy.bike?.manufacturer??next.bike.manufacturer
+    next.bike.model=legacy.bike?.model??next.bike.model
+    next.bike.variant=legacy.bike?.variant??legacy.bike?.trim?.split('•')?.[0]?.trim()??next.bike.variant
+    next.bike.colour=legacy.bike?.colour??next.bike.colour
+    next.bike.year=Number(legacy.bike?.year??next.bike.year)
+    next.bike.currentOdometer=Number(legacy.bike?.odo??legacy.bike?.currentOdometer??next.bike.currentOdometer)
+    next.bike.braking=legacy.bike?.braking??next.bike.braking
+    next.bike.chainLastOdometer=Number(legacy.bike?.chainLast??legacy.maintenance?.chain?.odometer??next.bike.chainLastOdometer)
+    next.gear=normalizeGear(legacy.gear)
 
-    const taskMap = legacy.ride?.tasks ?? {}
-    const dayDefs: Array<{day:number;date:string;from:string;to:string;title:string;tasks:Array<[string,string,string]>}> = [
-      {day:1,date:'2026-08-28',from:'Ahmedabad',to:'Banswara',title:'Travel + Mangarh + relaxed Banswara',tasks:[['04:15','Wake / light food','Final tyre, chain, brakes, rain gear, straps and documents.'],['05:00','Leave Home','Start before traffic builds.'],['09:15','Mangarh Dham','Quiet morning target.'],['12:00','Hotel check-in','Lunch and remove wet gear.'],['15:15','Anand Sagar + Kalpavriksha','Short quiet stop.'],['16:15','Kagdi Pick Up Weir','Leave if crowded.'],['20:00','Fuel + prep','Fill bike and prep Saturday bag.'],['21:15','Sleep','Saturday starts early.']]},
-      {day:2,date:'2026-08-29',from:'Banswara',to:'Banswara',title:'Backwaters + Mahi + Singhpura',tasks:[['04:45','Wake','Tea / banana / biscuits.'],['05:10','Leave hotel','Be rolling before normal visitors.'],['05:35','Chacha Kota','Normal access + safe firm dirt/grass only.'],['07:00','Mahi Dam','Visitor road only; obey barricades.'],['09:45','Singhpura Falls','Park and walk; no riding through pedestrian water crossing.'],['21:15','Sleep','Sunday starts early.']]},
-      {day:3,date:'2026-08-30',from:'Banswara',to:'Ahmedabad',title:'Jagmer off-road + Arthuna + home',tasks:[['04:45','Wake + pack','Keep the bike light for Jagmer.'],['05:30','Jagmer / Jagmeru','Firm red dirt/grass; rough sections solo only.'],['09:15','Arthuna','Explore the archaeological complex properly.'],['10:45','Leave for Ahmedabad','No more sightseeing.'],['16:30','Ahmedabad target','Rain/traffic buffer until 18:00.']]}
-    ]
-    const days: RideDay[] = dayDefs.map(d => ({...d,tasks:d.tasks.map((t,i):RideTask=>({id:`ban_d${d.day}_${i}`,time:t[0],title:t[1],desc:t[2],status:(taskMap[`${d.day}_${i}`] ?? 'upcoming') as RideTask['status'],delayMin:taskMap[`${d.day}_${i}_delay`] ? Number(taskMap[`${d.day}_${i}_delay`]) : undefined}))}))
-
-    return {
-      bike: {
-        id: 'bike_ronin_2026',
-        manufacturer: legacy.bike?.manufacturer ?? 'TVS',
-        model: legacy.bike?.model ?? 'Ronin',
-        variant: legacy.bike?.variant ?? 'Mid',
-        colour: legacy.bike?.colour ?? 'Charcoal Ember',
-        year: Number(legacy.bike?.year ?? 2026),
-        currentOdometer: Number(legacy.bike?.odo ?? legacy.bike?.currentOdometer ?? 3200),
-        braking: legacy.bike?.braking ?? 'Dual-Channel ABS'
-      },
-      gear,
-      rides: [{...fallbackRide,days}]
+    const r=next.rides[0]
+    const oldRide=legacy.ride??legacy.rides?.items?.find((x:any)=>x.id==='ride_banswara_2026')
+    if(oldRide){
+      if(Number.isFinite(Number(oldRide.selectedDay)))r.operations.selectedDay=Math.max(0,Math.min(Number(oldRide.selectedDay),r.days.length-1))
+      const oldTasks=oldRide.tasks??{}
+      for(const day of r.days){
+        for(let i=0;i<day.tasks.length;i++){
+          const t=day.tasks[i]
+          const oldKey=`${day.day}_${i}`
+          const val=oldTasks[oldKey]??oldRide.days?.find((d:any)=>d.day===day.day)?.tasks?.[i]?.status
+          if(['upcoming','done','delayed','skipped'].includes(val))r.operations.tasks[t.id]=val as RideTaskStatus
+          const delay=oldTasks[`${oldKey}_delay`]??oldRide.days?.find((d:any)=>d.day===day.day)?.tasks?.[i]?.delayMin
+          if(delay!=null)r.operations.delays[t.id]=Number(delay)
+        }
+      }
+      if(oldRide.expenses)r.operations.expenses={...r.operations.expenses,...oldRide.expenses}
+      if(Array.isArray(oldRide.fuelLogs))r.operations.fuelLogs=oldRide.fuelLogs.map((x:any)=>({id:String(x.id??crypto.randomUUID()),odometer:Number(x.odo??x.odometer??next.bike.currentOdometer),litres:Number(x.litres??0),amount:Number(x.amount??0),createdAt:String(x.createdAt??x.time??new Date().toISOString())}))
+      r.operations.notes=String(oldRide.notes??'')
+      r.operations.issues=Array.isArray(oldRide.issues)?oldRide.issues.map((x:any)=>({id:String(x.id??crypto.randomUUID()),note:String(x.note??''),severity:(x.severity??'Monitor'),odometer:Number(x.odo??x.odometer??next.bike.currentOdometer),createdAt:String(x.createdAt??x.time??new Date().toISOString())})):[]
+      r.operations.packing={...r.operations.packing,...(oldRide.packing??{})}
+      r.operations.content={...r.operations.content,...(oldRide.content??{})}
+      r.operations.backup={...r.operations.backup,...(oldRide.backup??{})}
+      r.operations.preflight={...r.operations.preflight,...(oldRide.preflight??{})}
+      if(Array.isArray(oldRide.customEmergency))r.operations.customEmergency=oldRide.customEmergency.slice(0,3)
     }
-  } catch {
-    return fallback
-  }
+    return next
+  }catch{return next}
 }
