@@ -14,4 +14,5 @@ jobs:
       - run: node --check app.js
       - run: node --check enhancements.js
       - run: node --check phase2e-restore.js
+      - run: node --check maps-demo.js
       - run: test -s index.html && test -s styles.css && test -s phase2e-restore.css && test -s manifest.webmanifest
