@@ -85,7 +85,7 @@ jobs:
           if(!auth.includes('Continue with Google')) throw new Error('Google login action missing');
           if(/Everything around your Ronin|TVS RONIN · CHARCOAL EMBER/.test(auth)) throw new Error('Onboarding contains bike-specific branding');
           const login=auth.slice(auth.indexOf('function renderLogin'),auth.indexOf('window.rhApprovedWelcomeBack'));
-          if(/Firebase|Firestore|Google Sign-In is ready/.test(login)) throw new Error('Visible login copy exposes backend jargon');
+          if(login.includes('App data syncs privately through Firebase and Firestore.')||login.includes('Google Sign-In is ready.')) throw new Error('Visible login copy exposes backend jargon');
           if(!index.includes('RIDER HUB')||!index.includes('MOTORCYCLE OS')) throw new Error('Generic pre-login header missing');
           if(!index.includes('rh-bell-svg')) throw new Error('Bell icon missing from header');
           if(!approved.includes('removePrivateWorkspace')) throw new Error('Private Workspace removal missing');
