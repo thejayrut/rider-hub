@@ -31,18 +31,20 @@ if(typeof priorSaveBike==='function')window.rhSaveApprovedBike=function(gate=fal
   return out;
 };
 
-let backfilled=false;
+let lastBackfillKey='';
 function backfillKnownBike(){
-  if(backfilled||!window.state?.profile?.publicUser||!window.state?.profile?.bikeConfigured)return;
-  const b=window.state.bike||{},entry=typeof window.riderHubMotorcycleProfile==='function'?window.riderHubMotorcycleProfile(b.manufacturer,b.model):null;if(!entry)return;
+  if(!window.state?.profile?.publicUser||!window.state?.profile?.bikeConfigured)return;
+  const b=window.state.bike||{},u=typeof window.riderHubFirebaseUser==='function'?window.riderHubFirebaseUser():null,key=`${u?.uid||'local'}|${b.manufacturer||''}|${b.model||''}|${b.variant||''}`;
+  if(key===lastBackfillKey)return;
+  const entry=typeof window.riderHubMotorcycleProfile==='function'?window.riderHubMotorcycleProfile(b.manufacturer,b.model):null;if(!entry){lastBackfillKey=key;return}
   const spec=entry.specs||{};let changed=false;
-  const put=(key,value)=>{if(value&&(!b[key]||b[key]==='Not added'||b[key]==='—')){b[key]=value;changed=true}};
+  const put=(field,value)=>{if(value&&(!b[field]||b[field]==='Not added'||b[field]==='—')){b[field]=value;changed=true}};
   put('engine',spec.engine);put('transmission',spec.transmission);put('fuelTank',spec.fuelTank);put('braking',entry.brakingByVariant?.[b.variant]);put('tyres',entry.tyresByVariant?.[b.variant]||spec.tyres);put('manualUrl',entry.manualUrl);put('maintenanceSummary',entry.serviceSummary);
   if(entry.chainIntervalKm&&!b.chainIntervalKm){b.chainIntervalKm=entry.chainIntervalKm;changed=true}
   if(typeof window.riderHubNextServiceKm==='function'&&(!b.nextServiceKm||b.nextServiceKm<=Number(b.odo||0))){const n=window.riderHubNextServiceKm(entry,b.odo);if(n){b.nextServiceKm=n;changed=true}}
-  backfilled=true;
+  lastBackfillKey=key;
   if(changed&&typeof window.save==='function')window.save();
 }
-window.addEventListener('riderhub-sync-status',()=>setTimeout(backfillKnownBike,350));
+window.addEventListener('riderhub-sync-status',event=>{if(event?.detail?.kind==='signedout')lastBackfillKey='';setTimeout(backfillKnownBike,350)});
 setTimeout(backfillKnownBike,1200);
 })();
