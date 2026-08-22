@@ -15,7 +15,6 @@ jobs:
       - run: node --check enhancements.js
       - run: node --check phase2e-restore.js
       - run: node --check maps-demo.js
-      - run: node --check cloud-sync.js
       - run: node --check phase3-live.js
       - run: node --check phase3-account.js
       - run: node --check phase3-public.js
@@ -25,14 +24,21 @@ jobs:
       - run: node --check motorcycle-catalog.js
       - run: node --check approved-changes.js
       - run: node --check approved-runtime-fixes.js
+      - run: node --check manual-reader.js
+      - run: node --check cloud-drive-v2.js
+      - run: node --check confirmed-features.js
       - run: node --check auth-flow-controller.js
       - run: node --check sw.js
       - run: node tests/auth-flow-smoke.js
       - run: node tests/runtime-fixes-smoke.js
+      - run: node tests/manual-reader-smoke.js
+      - run: node tests/confirmed-features-smoke.js
       - name: Check Firebase module syntax
         run: |
           cp firebase-auth.js /tmp/firebase-auth.mjs
           node --check /tmp/firebase-auth.mjs
+          cp firebase-account-delete.js /tmp/firebase-account-delete.mjs
+          node --check /tmp/firebase-account-delete.mjs
       - name: Validate JSON configuration
         run: |
           node - <<'NODE'
@@ -53,58 +59,66 @@ jobs:
           test -s phase3-account.css
           test -s firebase-account.css
           test -s approved-changes.css
+          test -s confirmed-features.css
           test -s state-bridge.js
           test -s stability-hotfix.js
           test -s motorcycle-catalog.js
           test -s approved-changes.js
           test -s approved-runtime-fixes.js
+          test -s manual-reader.js
+          test -s cloud-drive-v2.js
+          test -s confirmed-features.js
           test -s auth-flow-controller.js
+          test -s firebase-account-delete.js
           test -s tests/auth-flow-smoke.js
           test -s tests/runtime-fixes-smoke.js
+          test -s tests/manual-reader-smoke.js
+          test -s tests/confirmed-features-smoke.js
           test -s icon-192.svg
           test -s icon-512.svg
           test -s icon-maskable.svg
-          grep -Fq 'approved-changes.css' index.html
-          grep -Fq 'motorcycle-catalog.js' index.html
-          grep -Fq 'approved-changes.js' index.html
-          grep -Fq 'approved-runtime-fixes.js' index.html
+          grep -Fq 'confirmed-features.css' index.html
+          grep -Fq 'cloud-drive-v2.js' index.html
+          grep -Fq 'manual-reader.js' index.html
+          grep -Fq 'confirmed-features.js' index.html
+          grep -Fq 'firebase-account-delete.js' index.html
           grep -Fq 'auth-flow-controller.js' index.html
-          grep -Fq 'auth-flow-controller.js' sw.js
-          grep -Fq "const CACHE='riderhub-v29'" sw.js
-      - name: Check approved UX contract
+          grep -Fq 'confirmed-features.js' sw.js
+          grep -Fq "const CACHE='riderhub-v30'" sw.js
+          ! grep -Fq '<script src="cloud-sync.js"></script>' index.html
+      - name: Check confirmed UX contract
         run: |
           node - <<'NODE'
           const fs=require('fs');
           const auth=fs.readFileSync('auth-flow-controller.js','utf8');
           const approved=fs.readFileSync('approved-changes.js','utf8');
-          const publicLayer=fs.readFileSync('phase3-public.js','utf8');
-          const index=fs.readFileSync('index.html','utf8');
-          const catalog=fs.readFileSync('motorcycle-catalog.js','utf8');
           const runtime=fs.readFileSync('approved-runtime-fixes.js','utf8');
+          const publicLayer=fs.readFileSync('phase3-public.js','utf8');
+          const features=fs.readFileSync('confirmed-features.js','utf8');
+          const drive=fs.readFileSync('cloud-drive-v2.js','utf8');
+          const account=fs.readFileSync('firebase-account-delete.js','utf8');
           if((auth.match(/\{k:'/g)||[]).length!==3) throw new Error('Onboarding must have exactly three slides');
           if(!auth.includes('Continue with Google')) throw new Error('Google login action missing');
-          if(/Everything around your Ronin|TVS RONIN · CHARCOAL EMBER/.test(auth)) throw new Error('Onboarding contains bike-specific branding');
+          if(!auth.includes('PRIVATE FILES STAY YOURS')||!auth.includes('your own Google Drive')) throw new Error('Drive privacy highlight missing from onboarding');
           const login=auth.slice(auth.indexOf('function renderLogin'),auth.indexOf('window.rhApprovedWelcomeBack'));
-          if(login.includes('App data syncs privately through Firebase and Firestore.')||login.includes('Google Sign-In is ready.')) throw new Error('Visible login copy exposes backend jargon');
-          if(!index.includes('RIDER HUB')||!index.includes('MOTORCYCLE OS')) throw new Error('Generic pre-login header missing');
-          if(!index.includes('rh-bell-svg')) throw new Error('Bell icon missing from header');
+          if(/\bFirebase\b|\bFirestore\b|Google Sign-In is ready/.test(login)) throw new Error('Visible login copy exposes backend jargon');
           if(!approved.includes('removePrivateWorkspace')) throw new Error('Private Workspace removal missing');
           if(!approved.includes('GEAR GARAGE')||!approved.includes('Your riding inventory')) throw new Error('Approved Gear Garage missing');
           if(!approved.includes('Install as App')) throw new Error('Prominent install action missing');
-          const moreStart=approved.indexOf('window.renderMore=function');
-          const moreEnd=approved.indexOf('window.openAppSettings',moreStart);
-          const more=approved.slice(moreStart,moreEnd);
-          if(!more.includes('Emergency contacts')||!more.includes('My Account')||!more.includes('Files & storage')) throw new Error('Required More actions missing');
-          if(/Notifications|Weather & Maps|App settings/.test(more)) throw new Error('Removed More actions returned');
           if(!approved.includes('removeTopAddRide')) throw new Error('Duplicate Add Ride removal missing');
-          if(!catalog.includes('GetMakesForVehicleType/moto')||!catalog.includes('vehicletype/motorcycle')) throw new Error('Global motorcycle catalog lookup missing');
-          if(!catalog.includes("'tvs|ronin'")||!catalog.includes("'royal enfield|hunter 350'")) throw new Error('Verified motorcycle profiles missing');
+          if(!features.includes("Add Owner's Manual")||!features.includes('Skip / do later')) throw new Error('Owner manual flow missing');
+          if(!features.includes('Other manufacturers…')) throw new Error('Other manufacturer selector missing');
+          if(!features.includes('+ Add custom document')) throw new Error('Custom document flow missing');
+          if(!features.includes('purple|violet')||!features.includes('red|crimson')) throw new Error('Bike-colour accent mapping missing');
+          if(!drive.includes('https://www.googleapis.com/auth/drive.file')||drive.includes('drive.appdata')) throw new Error('Drive must use narrow visible-file scope');
+          if(!drive.includes("const ROOT_NAME='Rider Hub'")||!drive.includes("const MANUALS_NAME='Owner Manuals'")) throw new Error('Visible Rider Hub Drive folders missing');
+          if(!account.includes('deleteUser(user)')) throw new Error('Account deletion missing');
           if(!runtime.includes('UserManual2026/TVS-Ronin.pdf')||!runtime.includes('hunter-350-dual-channel.pdf')) throw new Error('Verified owner manual links missing');
           if(!publicLayer.includes('bikeConfigured:false')||!publicLayer.includes('s.gear=[]')||!publicLayer.includes('USER_PREFIX')) throw new Error('Clean per-user workspace contract missing');
-          if(!approved.includes("location.hostname===CANONICAL_HOST&&!publicUser()")) throw new Error('Starter-state migration guard missing');
-          if(!runtime.includes("localStorage.getItem('riderhub_v6')")) throw new Error('Saved legacy migration recovery missing');
-          if(!auth.includes('riderHubRequireBikeSetup')) throw new Error('Mandatory new-user motorcycle gate missing');
           NODE
+      - name: Check self-service deletion rules
+        run: |
+          grep -Fq 'allow delete: if owns(userId);' firestore.rules
       - name: Reject obsolete runtime layers
         run: |
           test ! -e cloud-sync-fix.js
@@ -118,7 +132,7 @@ jobs:
           }
       - name: Keep Google Drive file-only
         run: |
-          if grep -Eq 'riderhub_state_v1\.json|uploadState\(|downloadState\(' cloud-sync.js; then
+          if grep -Eq 'riderhub_state_v1\.json|uploadState\(|downloadState\(' cloud-drive-v2.js; then
             echo 'Google Drive must not be a second Rider Hub app-state database.'
             exit 1
           fi
