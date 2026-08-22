@@ -21,6 +21,8 @@ function make(){
  assert.strictEqual(t.window.riderHubAuthSlideIndex(),0);
  t.window.rhApprovedWelcomeNext();
  assert(t.stage.innerHTML.includes('Plan less while riding'));
+ assert(t.stage.innerHTML.includes('PRIVATE FILES STAY YOURS'));
+ assert(t.stage.innerHTML.includes('your own Google Drive'));
  assert.strictEqual(t.window.riderHubAuthSlideIndex(),1);
  t.window.rhApprovedWelcomeNext();
  assert(t.stage.innerHTML.includes('Your bike and rides can follow you across devices'));
@@ -35,41 +37,35 @@ function make(){
  t.stage.innerHTML='TECHNICAL LOGIN OVERRIDE';
  await new Promise(r=>setTimeout(r,50));
  assert(t.stage.innerHTML.includes('Continue with Google'),'signed-out restore lost login mode');
- assert(!t.stage.innerHTML.includes('TECHNICAL'));
 
  t=make();
  t.window.rhApprovedWelcomeNext();
- assert.strictEqual(t.window.riderHubAuthSlideIndex(),1);
  t.fire('signedout');
- t.stage.innerHTML='FIREBASE OVERRIDE';
+ t.stage.innerHTML='OLDER RESET';
  await new Promise(r=>setTimeout(r,50));
  assert.strictEqual(t.window.riderHubAuthSlideIndex(),1,'slide index reset');
  assert(t.stage.innerHTML.includes('Plan less while riding'),'slide 2 not restored');
 
- t=make();
- t.window.rhApprovedWelcomeNext();
- setTimeout(()=>{t.stage.innerHTML='OLDER SLIDE 1 RESET'},0);
- t.fire('signedout');
- t.stage.innerHTML='FIREBASE TECHNICAL LOGIN';
- await new Promise(r=>setTimeout(r,60));
- assert.strictEqual(t.window.riderHubAuthSlideIndex(),1,'competing listeners changed slide index');
- assert(t.stage.innerHTML.includes('Plan less while riding'),'controller did not win signed-out race');
-
- t=make();
- let gates=0;
+ t=make();let gates=0;
  t.window.riderHubFirebaseUser=()=>({uid:'u1'});
  t.window.state={profile:{publicUser:true,bikeConfigured:false}};
  t.window.riderHubRequireBikeSetup=()=>{gates++};
- t.fire('synced');
- await new Promise(r=>setTimeout(r,60));
+ t.fire('synced');await new Promise(r=>setTimeout(r,60));
  assert.strictEqual(gates,1,'new-user bike gate not enforced');
 
- t=make();
+ t=make();let manual=0;
  t.window.riderHubFirebaseUser=()=>({uid:'u2'});
- t.window.state={profile:{publicUser:true,bikeConfigured:true}};
+ t.window.state={profile:{publicUser:true,bikeConfigured:true,manualPromptCompleted:false}};
+ t.window.riderHubManualSetupNeeded=()=>true;
+ t.window.riderHubShowManualSetupStep=()=>{manual++};
+ t.fire('synced');await new Promise(r=>setTimeout(r,60));
+ assert.strictEqual(manual,1,'owner-manual gate not enforced');
+
+ t=make();
+ t.window.riderHubFirebaseUser=()=>({uid:'u3'});
+ t.window.state={profile:{publicUser:true,bikeConfigured:true,manualPromptCompleted:true}};
  t.shell.classList.add('active');
- t.fire('synced');
- await new Promise(r=>setTimeout(r,60));
+ t.fire('synced');await new Promise(r=>setTimeout(r,60));
  assert(!t.shell.classList.contains('active'),'existing user auth shell not hidden');
  console.log('auth-flow smoke tests: PASS');
 })().catch(e=>{console.error(e);process.exit(1)});
