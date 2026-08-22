@@ -29,15 +29,15 @@ function renderWelcome(i=index){
   const s=SLIDES[index];
   st.innerHTML=`<div class="rh-slide-kicker">${esc(s.k)}</div><h1>${esc(s.h)}</h1><p>${esc(s.p)}</p><div class="rh-auth-features">${s.f.map(x=>`<div class="rh-auth-feature"><b>${esc(x[0])}</b><span>${esc(x[1])}</span></div>`).join('')}</div><div class="rh-auth-dots">${SLIDES.map((_,n)=>`<i class="rh-auth-dot ${n===index?'active':''}"></i>`).join('')}</div><div class="rh-auth-actions">${index?'<button type="button" onclick="rhApprovedWelcomeBack()">Back</button>':''}<button type="button" class="primary" onclick="rhApprovedWelcomeNext()">${index===SLIDES.length-1?'Continue':'Next'}</button></div>`;
 }
-function renderLogin(){
+function renderLogin(message='',warn=false){
   const sh=shell(),st=stage();if(!sh||!st)return;
   mode='login';genericBrand();sh.classList.add('active');
-  st.innerHTML='<div class="rh-auth-login"><div class="rh-slide-kicker">MY ACCOUNT</div><h2>Sign in to Rider Hub</h2><p>Use your Google account to keep your Rider Hub available across your devices.</p><div class="rh-auth-form"><button id="rhGoogleFirebaseLogin" type="button" class="rh-auth-button primary full" onclick="rhLoginGoogle()">Continue with Google</button><div id="rhAuthNote" class="rh-auth-note"></div></div></div>';
+  st.innerHTML=`<div class="rh-auth-login"><div class="rh-slide-kicker">MY ACCOUNT</div><h2>Sign in to Rider Hub</h2><p>Use your Google account to keep your Rider Hub available across your devices.</p><div class="rh-auth-form"><button id="rhGoogleFirebaseLogin" type="button" class="rh-auth-button primary full" onclick="rhLoginGoogle()">Continue with Google</button><div id="rhAuthNote" class="rh-auth-note${warn?' warn':''}">${esc(message)}</div></div></div>`;
 }
 window.rhApprovedWelcomeBack=()=>renderWelcome(index-1);
 window.rhApprovedWelcomeNext=()=>index===SLIDES.length-1?renderLogin():renderWelcome(index+1);
 window.rhAuthShowWelcome=()=>renderWelcome(0);
-window.rhAuthShowLogin=renderLogin;
+window.rhAuthShowLogin=()=>renderLogin();
 window.riderHubAuthFlowMode=()=>mode;
 window.riderHubAuthSlideIndex=()=>index;
 
@@ -60,6 +60,13 @@ window.addEventListener('riderhub-sync-status',event=>{
   if(kind==='signedout'){
     queueMicrotask(restoreSignedOutUi);
     setTimeout(restoreSignedOutUi,30);
+    return;
+  }
+  if(kind==='error'&&!firebaseUser()){
+    setTimeout(()=>{
+      if(mode==='login')renderLogin('Sign-in could not start. Check your connection and reload Rider Hub.',true);
+      else restoreSignedOutUi();
+    },30);
     return;
   }
   if(kind==='loading')return;
