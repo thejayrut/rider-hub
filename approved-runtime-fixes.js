@@ -18,6 +18,19 @@ window.rhBikeSetupChanged=async function(level){
   if(typeof priorChange==='function')return priorChange.apply(this,arguments);
 };
 
+const priorSaveBike=window.rhSaveApprovedBike;
+if(typeof priorSaveBike==='function')window.rhSaveApprovedBike=function(gate=false){
+  const before={make:window.state?.bike?.manufacturer||'',model:window.state?.bike?.model||''};
+  const out=priorSaveBike.apply(this,arguments);
+  const after=window.state?.bike||{};
+  const changed=before.make&&before.model&&(before.make!==after.manufacturer||before.model!==after.model);
+  if(changed){
+    after.purchase='Not added';after.insurance='Not added';after.firstService={odo:0,date:'Not added',cost:0};after.serviceHistory=[];
+    if(typeof window.save==='function')window.save();
+  }
+  return out;
+};
+
 let backfilled=false;
 function backfillKnownBike(){
   if(backfilled||!window.state?.profile?.publicUser||!window.state?.profile?.bikeConfigured)return;
