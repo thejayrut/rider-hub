@@ -3,6 +3,20 @@
 'use strict';
 const escR=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+/* The generic starter state must never become a new account's cloud state, but a
+   genuine pre-Firebase Rider Hub user can still migrate a locally saved workspace
+   on their first Firebase sign-in. */
+const protectedExport=window.riderHubExportState;
+if(typeof protectedExport==='function')window.riderHubExportState=function(){
+  const isCanonical=location.hostname==='rider-hub-506306.firebaseapp.com';
+  const isPublic=!!window.state?.profile?.publicUser;
+  const savedLegacy=!!localStorage.getItem('riderhub_v6');
+  if(isCanonical&&!isPublic&&savedLegacy){
+    try{return JSON.parse(JSON.stringify(window.state))}catch{return null}
+  }
+  return protectedExport.apply(this,arguments);
+};
+
 /* Keep verified manual sources current. */
 const catalog=window.RIDER_HUB_MOTORCYCLE_CATALOG;
 if(catalog?.profiles?.['tvs|ronin'])catalog.profiles['tvs|ronin'].manualUrl='https://www.tvsmotor.com/-/media/Feature/Owners/UserManual2026/TVS-Ronin.pdf';
