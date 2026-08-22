@@ -15,7 +15,6 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const shell=()=>document.querySelector('#rhAuthShell');
 const stage=()=>document.querySelector('#rhAuthStage');
 const firebaseUser=()=>typeof window.riderHubFirebaseUser==='function'?window.riderHubFirebaseUser():null;
-const syncStatus=()=>typeof window.riderHubFirebaseSyncStatus==='function'?window.riderHubFirebaseSyncStatus():null;
 const publicUser=()=>!!window.state?.profile?.publicUser;
 const bikeConfigured=()=>!!window.state?.profile?.bikeConfigured;
 
@@ -69,14 +68,8 @@ window.addEventListener('riderhub-sync-status',event=>{
     },30);
     return;
   }
-  if(kind==='loading')return;
-  if(kind==='syncing'){
-    setTimeout(()=>{
-      if(syncStatus()?.kind==='syncing'&&firebaseUser())shell()?.classList.remove('active');
-    },320);
-    return;
-  }
-  setTimeout(enforceSignedInGate,420);
+  if(kind==='loading'||kind==='syncing')return;
+  setTimeout(enforceSignedInGate,30);
 });
 
 function hasRememberedFirebaseSession(){
