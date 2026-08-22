@@ -15,4 +15,12 @@ jobs:
       - run: node --check enhancements.js
       - run: node --check phase2e-restore.js
       - run: node --check maps-demo.js
-      - run: test -s index.html && test -s styles.css && test -s phase2e-restore.css && test -s manifest.webmanifest
+      - run: node --check cloud-sync.js
+      - run: node --check phase3-live.js
+      - run: test -s index.html && test -s styles.css && test -s phase2e-restore.css && test -s phase3-live.css && test -s manifest.webmanifest
+      - name: Reject committed Google API keys
+        run: |
+          if grep -R -n --exclude-dir=.git 'AIza[0-9A-Za-z_-]\{20,\}' . 2>/dev/null; then
+            echo 'Google keys must stay device-local.'
+            exit 1
+          fi
