@@ -20,15 +20,17 @@ const publicUser=()=>!!window.state?.profile?.publicUser;
 const bikeConfigured=()=>!!window.state?.profile?.bikeConfigured;
 const manualNeeded=()=>typeof window.riderHubManualSetupNeeded==='function'&&window.riderHubManualSetupNeeded();
 const transition=()=>!!window.RIDER_HUB_AUTH_TRANSITION||!!(typeof sessionStorage!=='undefined'&&sessionStorage.getItem(REDIRECT_KEY));
+const waitingForCloud=()=>!!window.RIDER_HUB_WAIT_FOR_CLOUD;
 
 function genericBrand(){
   const small=document.querySelector('#rhAuthShell .rh-auth-brand small');
   if(small)small.textContent='MOTORCYCLE OS';
 }
 function renderOpening(){
+  if(typeof window.riderHubShowAuthOpening==='function'){window.riderHubShowAuthOpening();mode='opening';return}
   const sh=shell(),st=stage();if(!sh||!st)return;
   mode='opening';genericBrand();sh.classList.add('active');
-  st.innerHTML='<div class="rh-auth-opening"><div class="rh-slide-kicker">RIDER HUB</div><h2>Opening your Rider Hub…</h2><p>Loading your motorcycle, rides, gear and saved workspace.</p><div class="rh-auth-opening-bar"><i></i></div></div>';
+  st.innerHTML='<div class="rh-auth-opening rh-auth-opening-v32"><div class="rh-opening-emblem">RH</div><div class="rh-slide-kicker">RIDER HUB</div><h2>Opening your Rider Hub</h2><p>Checking your saved workspace.</p><div class="rh-opening-dots"><i></i><i></i><i></i></div></div>';
 }
 function renderWelcome(i=index){
   const sh=shell(),st=stage();if(!sh||!st)return;
@@ -57,6 +59,8 @@ function restoreSignedOutUi(){
 function enforceSignedInGate(){
   if(transition())return;
   if(!firebaseUser())return;
+  if(window.RIDER_HUB_CLOUD_UNRESOLVED){mode='opening';return}
+  if(waitingForCloud()){renderOpening();return}
   if(publicUser()&&!bikeConfigured()){
     mode='setup';
     if(typeof window.riderHubRequireBikeSetup==='function')window.riderHubRequireBikeSetup();
@@ -88,7 +92,11 @@ window.addEventListener('riderhub-sync-status',event=>{
     },30);
     return;
   }
-  if(kind==='loading'||kind==='syncing')return;
+  if(kind==='loading')return;
+  if(kind==='syncing'&&!waitingForCloud()){
+    setTimeout(enforceSignedInGate,0);
+    return;
+  }
   setTimeout(enforceSignedInGate,0);
 });
 
