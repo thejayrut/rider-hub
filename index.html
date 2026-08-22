@@ -10,6 +10,24 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script>
+(()=>{
+  const root=document.documentElement;root.classList.add('rh-preboot');
+  try{
+    const session=JSON.parse(localStorage.getItem('riderhub_auth_session_v1')||'null');
+    const uid=session?.provider==='firebase'&&session?.uid?session.uid:'';
+    const key=uid?'riderhub_public_state_v1_'+encodeURIComponent(uid):'';
+    const saved=key?JSON.parse(localStorage.getItem(key)||'null'):null;
+    const c=saved?.ui?.accentColor;
+    if(/^#[0-9a-f]{6}$/i.test(String(c||''))){
+      const n=parseInt(c.slice(1),16),r=n>>16,g=(n>>8)&255,b=n&255;
+      root.style.setProperty('--ember',c);root.style.setProperty('--ember2',c);root.style.setProperty('--soft',`rgba(${r},${g},${b},.11)`);root.style.setProperty('--rh-accent',c);
+    }
+  }catch{}
+  setTimeout(()=>root.classList.remove('rh-preboot'),1600);
+})();
+</script>
+<style>html.rh-preboot body{visibility:hidden}</style>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.svg" type="image/svg+xml">
 <link rel="stylesheet" href="styles.css">
@@ -20,6 +38,7 @@
 <link rel="stylesheet" href="approved-changes.css">
 <link rel="stylesheet" href="confirmed-features.css">
 <link rel="stylesheet" href="final-polish.css">
+<link rel="stylesheet" href="v32-ui.css">
 <title>Rider Hub</title>
 </head>
 <body>
@@ -72,6 +91,9 @@
 <script src="ride-mode-polish.js"></script>
 <script src="final-polish.js"></script>
 <script src="v31-undo-guards.js"></script>
+<script src="manual-reader-v3.js"></script>
+<script src="v32-fixes.js"></script>
+<script src="v32-fast-start.js"></script>
 <script src="auth-flow-controller.js"></script>
 <script src="firebase-config.js"></script>
 <script type="module" src="firebase-auth.js"></script>
