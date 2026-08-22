@@ -6,6 +6,8 @@ const ASSETS=[
   './icon-192.svg','./icon-512.svg','./icon-maskable.svg'
 ];
 
+const delay=ms=>new Promise((_,reject)=>setTimeout(()=>reject(new Error('network timeout')),ms));
+
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });
@@ -29,23 +31,28 @@ self.addEventListener('fetch',event=>{
   if(url.origin!==self.location.origin||url.pathname.startsWith('/__/'))return;
 
   if(req.mode==='navigate'){
-    event.respondWith(
-      fetch(req)
-        .then(resp=>{
-          if(resp&&resp.ok)caches.open(CACHE).then(cache=>cache.put('./index.html',resp.clone())).catch(()=>{});
-          return resp;
-        })
-        .catch(()=>caches.match('./index.html'))
-    );
+    event.respondWith((async()=>{
+      const cached=await caches.match('./index.html');
+      const network=fetch(req).then(resp=>{
+        if(resp&&resp.ok)caches.open(CACHE).then(cache=>cache.put('./index.html',resp.clone())).catch(()=>{});
+        return resp;
+      });
+      if(!cached)return network;
+      try{return await Promise.race([network,delay(1400)])}catch{return cached}
+    })());
     return;
   }
 
-  event.respondWith(
-    fetch(req)
-      .then(resp=>{
-        if(resp&&resp.ok)caches.open(CACHE).then(cache=>cache.put(req,resp.clone())).catch(()=>{});
-        return resp;
-      })
-      .catch(()=>caches.match(req))
-  );
+  /* Static app files are cache-first. A slow connection must never hold the UI
+     hostage for minutes. When cached content exists, serve it immediately and
+     refresh that cache in the background. */
+  event.respondWith((async()=>{
+    const cached=await caches.match(req);
+    const network=fetch(req).then(resp=>{
+      if(resp&&resp.ok)caches.open(CACHE).then(cache=>cache.put(req,resp.clone())).catch(()=>{});
+      return resp;
+    });
+    if(cached){event.waitUntil(network.catch(()=>{}));return cached}
+    try{return await network}catch{return caches.match(req)}
+  })());
 });
