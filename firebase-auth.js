@@ -9,6 +9,8 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut
 } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js';
 import {
@@ -23,6 +25,18 @@ const CFG = window.RIDER_HUB_FIREBASE_CONFIG;
 const AUTH_KEY = 'riderhub_auth_session_v1';
 const DIRTY_PREFIX = 'riderhub_firebase_dirty_v1_';
 const MIGRATION_KEY = 'riderhub_firebase_legacy_migrated_v1';
+const REDIRECT_KEY = 'riderhub_firebase_redirect_pending_v1';
+const CANONICAL_HOST = 'rider-hub-506306.firebaseapp.com';
+const CANONICAL_URL = `https://${CANONICAL_HOST}/`;
+
+/* Firebase documents that redirect auth is unaffected on a firebaseapp.com
+   Hosting subdomain. The web.app alias serves the same deployment, so make
+   firebaseapp.com the canonical Rider Hub origin before auth begins. */
+if (location.hostname === 'rider-hub-506306.web.app') {
+  location.replace(`https://${CANONICAL_HOST}${location.pathname}${location.search}${location.hash}`);
+}
+window.RIDER_HUB_CANONICAL_URL = CANONICAL_URL;
+
 let auth = null;
 let db = null;
 let ready = false;
@@ -42,6 +56,8 @@ const setDirty = (uid, on = true) => {
   else localStorage.removeItem(dirtyKey(uid));
 };
 const isDirty = uid => !!(uid && localStorage.getItem(dirtyKey(uid)) === '1');
+const isMobileBrowser = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+const sameOriginAuth = () => !!CFG?.authDomain && location.hostname === CFG.authDomain;
 
 const note = (text, warn = false) => {
   const n = document.querySelector('#rhAuthNote');
@@ -53,13 +69,17 @@ const note = (text, warn = false) => {
 };
 
 function firebaseLoginMarkup() {
+  const hosted = location.hostname === CANONICAL_HOST;
+  const helper = hosted
+    ? 'Google Sign-In is ready.'
+    : 'This fallback build can still open Rider Hub, but mobile sign-in is most reliable on Firebase Hosting.';
   return `<div class="rh-auth-login">
     <div class="rh-slide-kicker">MY ACCOUNT</div>
     <h2>Sign in to Rider Hub</h2>
-    <p>Use your Google account. Your Rider Hub data is kept in your private Firebase workspace and synced across devices.</p>
+    <p>Use your Google account. App data syncs privately through Firebase and Firestore.</p>
     <div class="rh-auth-form">
       <button id="rhGoogleFirebaseLogin" class="rh-auth-button primary full">Continue with Google</button>
-      <div id="rhAuthNote" class="rh-auth-note">Google Sign-In is ready.</div>
+      <div id="rhAuthNote" class="rh-auth-note">${helper}</div>
     </div>
   </div>`;
 }
@@ -74,6 +94,7 @@ function wireLoginUi() {
 
   const google = stage.querySelector('#rhGoogleFirebaseLogin') || [...stage.querySelectorAll('button')].find(b => /continue with google/i.test(b.textContent || ''));
   if (google) {
+    google.id = 'rhGoogleFirebaseLogin';
     google.onclick = () => window.rhLoginGoogle();
     google.disabled = !ready;
   }
@@ -85,7 +106,7 @@ function ensureLoggedOutUi() {
   if (!shell) return;
   shell.classList.add('active');
   const stage = shell.querySelector('#rhAuthStage');
-  if (stage && !stage.children.length) stage.innerHTML = firebaseLoginMarkup();
+  if (stage) stage.innerHTML = firebaseLoginMarkup();
   wireLoginUi();
 }
 
@@ -174,7 +195,7 @@ window.riderHubFirebaseSyncNow = async function () {
     return false;
   }
   const ok = await pushUserState();
-  if (typeof window.toast === 'function') window.toast(ok ? 'Rider Hub synced' : 'Sync pending · will retry when online');
+  if (typeof window.toast === 'function') window.toast(ok ? 'Rider Hub app data synced' : 'Sync pending · will retry when online');
   return ok;
 };
 
@@ -229,7 +250,18 @@ window.rhLoginGoogle = async function () {
   if (!ready || !auth) return note('Google Sign-In is still loading. Try again in a moment.', true);
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
+
   try {
+    /* On Android/iOS use redirect only when the app and Firebase auth helper are
+       the same firebaseapp.com origin. This avoids the blank mobile popup seen
+       on GitHub Pages and avoids modern third-party-storage redirect failures. */
+    if (isMobileBrowser() && sameOriginAuth()) {
+      note('Opening Google Sign-In…');
+      sessionStorage.setItem(REDIRECT_KEY, '1');
+      await signInWithRedirect(auth, provider);
+      return;
+    }
+
     note('Opening Google Sign-In…');
     await signInWithPopup(auth, provider);
     note('Signed in. Loading your Rider Hub…');
@@ -238,12 +270,15 @@ window.rhLoginGoogle = async function () {
     if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) {
       note('Google Sign-In was cancelled.');
     } else if (code.includes('popup-blocked')) {
-      note('Your browser blocked the Google sign-in window. Allow pop-ups for Rider Hub and try again.', true);
+      note('Your browser blocked the Google sign-in window. Allow pop-ups and try again.', true);
     } else if (code.includes('unauthorized-domain')) {
       note('This Rider Hub domain is not authorized in Firebase Authentication.', true);
     } else {
       console.error('Rider Hub Google Sign-In failed', e);
-      note('Could not sign in with Google. Check your connection and try again.', true);
+      const fallbackHint = isMobileBrowser() && !sameOriginAuth()
+        ? ' Mobile sign-in will use redirect on the Firebase-hosted Rider Hub.'
+        : '';
+      note('Could not sign in with Google.' + fallbackHint, true);
     }
   }
 };
@@ -260,7 +295,7 @@ function installAccountModal() {
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     if (typeof window.openModal !== 'function') return;
     window.openModal(`<div class="modalhead"><div><div class="kicker">MY ACCOUNT</div><h3>${esc(u.displayName || 'Rider Hub')}</h3><p class="caption">${esc(u.email || '')}</p></div><button class="round" onclick="closeModal()">×</button></div>
-      <div class="routecard"><strong>Rider Hub cloud data</strong><p>Firebase account connected · private workspace active.</p></div>
+      <div class="routecard"><strong>Rider Hub app data</strong><p>Firebase account connected · private Firestore workspace active.</p></div>
       <div class="routecard"><strong>Private file backup</strong><p>Google Drive: ${esc(driveLabel)}</p></div>
       <div class="grid2"><button class="secondary" onclick="riderHubFirebaseSyncNow()">Sync app data</button><button class="primary" onclick="requestDriveAccess(true)">${driveConnected ? 'Refresh Drive' : 'Connect Drive'}</button></div>
       <button class="secondary full rh-logout" style="margin-top:8px" onclick="logoutRiderHub()">Log out</button>`);
@@ -295,6 +330,7 @@ async function init() {
     note('Firebase configuration is missing.', true);
     return;
   }
+
   try {
     const app = initializeApp(CFG);
     auth = getAuth(app);
@@ -303,6 +339,19 @@ async function init() {
     ready = true;
     installAccountModal();
     wireLoginUi();
+
+    if (sessionStorage.getItem(REDIRECT_KEY)) {
+      try {
+        note('Finishing Google Sign-In…');
+        const result = await getRedirectResult(auth);
+        if (result?.user) await enterUser(result.user);
+      } catch (e) {
+        console.error('Rider Hub redirect sign-in failed', e);
+        note('Google Sign-In did not complete. Try again.', true);
+      } finally {
+        sessionStorage.removeItem(REDIRECT_KEY);
+      }
+    }
 
     onAuthStateChanged(auth, async user => {
       if (user) {
