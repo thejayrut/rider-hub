@@ -1,0 +1,16 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const code=fs.readFileSync('manual-reader-v3.js','utf8');
+const window={riderHubProcessOwnerManual:async()=>({status:'processed',fields:{},extraSpecs:[],serviceMilestones:[],maintenance:[],warnings:[]}),state:{bike:{}}};
+const context={window,console,String,Number,Math,Date,RegExp,Object,Array,Set,Promise};context.globalThis=context;vm.createContext(context);vm.runInContext(code,context);
+const parse=window.riderHubParseTyrePressurePageV3;
+let p=parse('TYRE PRESSURE cold tyre pressure Rider only Front 29 psi Rear 32 psi With pillion Front 29 psi Rear 36 psi');
+assert(p,'pressure table not detected');
+assert.strictEqual(p.solo.front,'29 psi');
+assert.strictEqual(p.solo.rear,'32 psi');
+assert.strictEqual(p.pillion.front,'29 psi');
+assert.strictEqual(p.pillion.rear,'36 psi');
+p=parse('Tire pressure Front 32 psi Rear 36 psi');
+assert.strictEqual(p.solo.front,'32 psi');
+assert.strictEqual(p.solo.rear,'36 psi');
+assert.strictEqual(p.pillion.front,'');
+console.log('manual v3 pressure smoke: PASS');
