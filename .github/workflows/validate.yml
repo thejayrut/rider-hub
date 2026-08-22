@@ -19,7 +19,6 @@ jobs:
       - run: node --check phase3-live.js
       - run: node --check phase3-account.js
       - run: node --check phase3-public.js
-      - run: node --check phase4-personalization.js
       - run: node --check firebase-ui-bridge.js
       - run: node --check sw.js
       - name: Check Firebase module syntax
@@ -45,13 +44,9 @@ jobs:
           test -s phase3-live.css
           test -s phase3-account.css
           test -s firebase-account.css
-          test -s phase4-personalization.css
-          test -s phase4-personalization.js
           test -s icon-192.svg
           test -s icon-512.svg
           test -s icon-maskable.svg
-          grep -Fq 'phase4-personalization.js' index.html
-          grep -Fq 'phase4-personalization.js' sw.js
       - name: Reject obsolete runtime layers
         run: |
           test ! -e cloud-sync-fix.js
