@@ -1,0 +1,11 @@
+import { useState } from 'react'
+import { Modal, ModalHead } from './Modal'
+import { useRiderHub } from '../store/RiderHubProvider'
+import { connectDrive, disconnectDrive, getDriveConfig, isDriveConnected, setDriveClientId, syncAppState } from '../services/googleDriveSync'
+
+export function AccountModal({open,onClose}:{open:boolean;onClose:()=>void}){
+  const store=useRiderHub();const cfg=getDriveConfig();const [clientId,setClient]=useState(cfg.clientId||''),[status,setStatus]=useState(''),[busy,setBusy]=useState(false)
+  const connect=async()=>{if(!clientId.trim())return setStatus('Add your Google Web Client ID first.');setDriveClientId(clientId);setBusy(true);setStatus('Connecting…');try{const p=await connectDrive(true);setStatus(`Connected as ${p.email}.`)}catch(e){setStatus(e instanceof Error?e.message:'Could not connect')}finally{setBusy(false)}}
+  const sync=async()=>{setBusy(true);setStatus('Syncing…');try{if(!isDriveConnected())await connectDrive(false);const result=await syncAppState(store.state,s=>store.replaceState(s,'cloud sync'));setStatus(result==='downloaded'?'Downloaded newer Rider Hub data.':'Rider Hub data synced.')}catch(e){setStatus(e instanceof Error?e.message:'Sync failed')}finally{setBusy(false)}}
+  return <Modal open={open} onClose={onClose} title="My Account"><ModalHead kicker="MY ACCOUNT" title={cfg.profile?.name||'Rider Hub'} onClose={onClose} desc={cfg.profile?.email||'Connect Google Drive to use the same Rider Hub data and files across your devices.'}/><div className="routeCard"><strong>Cloud sync</strong><p>{isDriveConnected()?(cfg.profile?.email||'Connected'):cfg.clientId?'Reconnect needed':'Not connected'}{cfg.lastSync?` · Last sync ${new Date(cfg.lastSync).toLocaleString()}`:''}</p></div><div className="field"><label>GOOGLE WEB CLIENT ID</label><input value={clientId} onChange={e=>setClient(e.target.value)} placeholder="xxxxxxxx.apps.googleusercontent.com"/></div><div className="grid2"><button className="secondary" disabled={busy} onClick={connect}>{isDriveConnected()?'Reconnect':'Connect Google'}</button><button className="primary" disabled={busy||!clientId.trim()} onClick={sync}>Sync now</button></div>{cfg.clientId&&<button className="secondary full" onClick={()=>{disconnectDrive();setStatus('Disconnected.')}}>Disconnect</button>}{status&&<div className="inlineNote">{status}</div>}</Modal>
+}
