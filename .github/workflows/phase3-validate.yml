@@ -15,6 +15,7 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm run build
+      - run: test -s src/components/RideDetailV2.tsx && test -s src/components/MorePage.tsx && test -s src/services/googleDriveSync.ts
       - name: Reject committed Google API keys
         run: |
           if grep -R -n --exclude-dir=node_modules --exclude-dir=.git 'AIza[0-9A-Za-z_-]\{20,\}' src docs .env.example 2>/dev/null; then
