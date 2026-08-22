@@ -20,8 +20,10 @@ window.RIDER_HUB_EXIT_LOCAL_PREVIEW=function(showLogin=true){
  if(typeof window.closeModal==='function')try{window.closeModal()}catch{}
 };
 
-/* Old Drive-based sessions must never count as Firebase authentication. */
-try{const s=JSON.parse(localStorage.getItem(AUTH)||'null');if(s&&s.provider!=='firebase')localStorage.removeItem(AUTH)}catch{localStorage.removeItem(AUTH)}
+/* Old Drive-based sessions must never count as Firebase authentication.
+   phase3-account.js has a delayed legacy session check, so clean again after it runs. */
+function cleanLegacyAuth(){try{const s=JSON.parse(localStorage.getItem(AUTH)||'null');if(s&&s.provider!=='firebase')localStorage.removeItem(AUTH)}catch{localStorage.removeItem(AUTH)}}
+cleanLegacyAuth();setTimeout(cleanLegacyAuth,180);setTimeout(cleanLegacyAuth,900)
 
 /* Prevent the legacy Phase 3 Drive OAuth handler from being used as account login
    during the short interval before firebase-auth.js loads. */
