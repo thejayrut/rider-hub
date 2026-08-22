@@ -23,7 +23,7 @@ jobs:
             manual-reader-v2.js manual-reader-v3.js cloud-drive-v2.js \
             confirmed-features.js ride-pdf-importer.js ride-mode-v2.js \
             ride-mode-polish.js final-polish.js v31-undo-guards.js v32-fixes.js \
-            v32-fast-start.js auth-flow-controller.js sw.js; do
+            v32-version.js v32-fast-start.js auth-flow-controller.js sw.js; do
             node --check "$f"
           done
 
@@ -63,7 +63,7 @@ jobs:
       - name: Check v32 assets and runtime order
         run: |
           for f in index.html styles.css v32-ui.css v32-fast-start.js v32-fixes.js \
-            manual-reader-v3.js auth-flow-controller.js auth-transition-guard.js \
+            v32-version.js manual-reader-v3.js auth-flow-controller.js auth-transition-guard.js \
             firebase-auth.js firebase-account-delete.js sw.js firestore.rules; do
             test -s "$f"
           done
@@ -71,13 +71,15 @@ jobs:
           grep -Fq 'v32-ui.css' index.html
           grep -Fq 'manual-reader-v3.js' index.html
           grep -Fq 'v32-fixes.js' index.html
+          grep -Fq 'v32-version.js' index.html
           grep -Fq 'v32-fast-start.js' index.html
+          grep -Fq 'v32-version.js' sw.js
           grep -Fq 'v32-fast-start.js' sw.js
           ! grep -Fq '<script src="cloud-sync.js"></script>' index.html
           node - <<'NODE'
           const fs=require('fs');
           const html=fs.readFileSync('index.html','utf8');
-          const order=['motorcycle-catalog.js','auth-transition-guard.js','approved-changes.js','confirmed-features.js','manual-reader-v2.js','ride-mode-v2.js','final-polish.js','manual-reader-v3.js','v32-fixes.js','v32-fast-start.js','auth-flow-controller.js','firebase-auth.js'];
+          const order=['motorcycle-catalog.js','auth-transition-guard.js','approved-changes.js','confirmed-features.js','manual-reader-v2.js','ride-mode-v2.js','final-polish.js','manual-reader-v3.js','v32-fixes.js','v32-version.js','v32-fast-start.js','auth-flow-controller.js','firebase-auth.js'];
           let last=-1;
           for(const file of order){
             const i=html.indexOf(file);
@@ -94,6 +96,7 @@ jobs:
           const auth=fs.readFileSync('auth-flow-controller.js','utf8');
           const features=fs.readFileSync('confirmed-features.js','utf8');
           const polish=fs.readFileSync('final-polish.js','utf8');
+          const version=fs.readFileSync('v32-version.js','utf8');
           const drive=fs.readFileSync('cloud-drive-v2.js','utf8');
           const ride=fs.readFileSync('ride-mode-v2.js','utf8');
           const publicLayer=fs.readFileSync('phase3-public.js','utf8');
@@ -101,6 +104,7 @@ jobs:
           if(!auth.includes('Continue with Google')||!auth.includes('PRIVATE FILES STAY YOURS')) throw new Error('Approved onboarding missing');
           if(!features.includes('Other manufacturers…')||!features.includes("Add Owner's Manual")) throw new Error('Motorcycle setup/manual flow missing');
           if(!polish.includes("CREATOR='Jayrut Gajjar'")||!polish.includes("FEEDBACK_EMAIL='jayrut.raw@gmail.com'")) throw new Error('About/feedback identity missing');
+          if(!version.includes("VERSION='v32'")||!version.includes("CREATOR='Jayrut Gajjar'")) throw new Error('v32 About/version label missing');
           for(const text of ['Create manually','Import ride from PDF','Open Ride Mode','Expenses','Fuel','Packing','Media backup','Tomorrow','Emergency','Traffic','Summary']) if(!ride.includes(text)) throw new Error(`Ride Mode missing ${text}`);
           if(!drive.includes('https://www.googleapis.com/auth/drive.file')||drive.includes('drive.appdata')) throw new Error('Drive must use narrow visible-file scope');
           if(!publicLayer.includes('bikeConfigured:false')||!publicLayer.includes('USER_PREFIX')) throw new Error('Per-user clean workspace contract missing');
