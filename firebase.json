@@ -7,6 +7,7 @@
       "firestore.rules",
       "FIREBASE_DEPLOY.md",
       "ARCHITECTURE.md",
+      "TEST_PLAN.md",
       "**/.*",
       "**/node_modules/**"
     ],
