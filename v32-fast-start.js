@@ -28,6 +28,13 @@ function applyAccentFrom(state){
   document.documentElement.style.setProperty('--soft',`rgba(${r},${g},${b},.11)`);
   document.documentElement.style.setProperty('--rh-accent',c);
 }
+function applyBrandFrom(state){
+  if(!state?.profile?.bikeConfigured)return;
+  const b=state.bike||{},name=document.querySelector('.header .brandname'),sub=document.querySelector('.header .brand .sub');
+  if(name)name.textContent=b.name||[b.manufacturer,b.model].filter(Boolean).join(' ')||'RIDER HUB';
+  if(sub)sub.textContent=[b.variant,b.colour].filter(Boolean).join(' · ').toUpperCase()||'MY MOTORCYCLE';
+  document.title=`Rider Hub — ${b.name||b.model||'Motorcycle'}`;
+}
 function reveal(){document.documentElement.classList.remove('rh-preboot')}
 function markWaiting(on){
   waitingForCloud=!!on;
@@ -65,6 +72,7 @@ function bootCachedSession(){
       provider:'firebase'
     });
     if(typeof window.render==='function')window.render();
+    applyAccentFrom(cached);applyBrandFrom(cached);
     shell()?.classList.remove('active');
   }catch(e){console.warn('Rider Hub fast local boot unavailable',e)}
   return true;
@@ -85,14 +93,14 @@ window.addEventListener('riderhub-sync-status',event=>{
     if(kind==='syncing'&&/opening|cloud|workspace/i.test(String(event?.detail?.detail||''))){
       markWaiting(!cached?.profile?.publicUser);
       if(cached?.profile?.publicUser){
-        applyAccentFrom(cached);
+        applyAccentFrom(cached);applyBrandFrom(cached);
         setTimeout(()=>shell()?.classList.remove('active'),0);
       }
       return;
     }
     if(kind==='synced'||kind==='conflict'||kind==='local'){
       markWaiting(false);unresolved=false;window.RIDER_HUB_CLOUD_UNRESOLVED=false;
-      const now=cachedFor(user.uid);if(now)applyAccentFrom(now);
+      const now=cachedFor(user.uid);if(now){applyAccentFrom(now);applyBrandFrom(now)}
       return;
     }
     if((kind==='pending'||kind==='error'||kind==='offline')&&waitingForCloud&&!cached?.profile?.publicUser){
