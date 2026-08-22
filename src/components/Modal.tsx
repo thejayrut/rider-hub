@@ -8,7 +8,11 @@ export function Modal({open,onClose,children,title}:{open:boolean;onClose:()=>vo
     history.pushState({...history.state,rhModal:true},'',location.href)
     const onPop=(event:PopStateEvent)=>{event.stopImmediatePropagation();onClose()}
     window.addEventListener('popstate',onPop,{once:true,capture:true})
-    return()=>{document.body.style.overflow=prev;window.removeEventListener('popstate',onPop,{capture:true})}
+    return()=>{
+      document.body.style.overflow=prev
+      window.removeEventListener('popstate',onPop,{capture:true})
+      if(history.state?.rhModal)queueMicrotask(()=>{if(history.state?.rhModal)history.back()})
+    }
   },[open,onClose])
   if(!open)return null
   const close=()=>{if(history.state?.rhModal)history.back();else onClose()}
