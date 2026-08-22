@@ -27,6 +27,8 @@ jobs:
       - run: node --check approved-runtime-fixes.js
       - run: node --check auth-flow-controller.js
       - run: node --check sw.js
+      - run: node tests/auth-flow-smoke.js
+      - run: node tests/runtime-fixes-smoke.js
       - name: Check Firebase module syntax
         run: |
           cp firebase-auth.js /tmp/firebase-auth.mjs
@@ -57,6 +59,8 @@ jobs:
           test -s approved-changes.js
           test -s approved-runtime-fixes.js
           test -s auth-flow-controller.js
+          test -s tests/auth-flow-smoke.js
+          test -s tests/runtime-fixes-smoke.js
           test -s icon-192.svg
           test -s icon-512.svg
           test -s icon-maskable.svg
@@ -66,7 +70,7 @@ jobs:
           grep -Fq 'approved-runtime-fixes.js' index.html
           grep -Fq 'auth-flow-controller.js' index.html
           grep -Fq 'auth-flow-controller.js' sw.js
-          grep -Fq "const CACHE='riderhub-v26'" sw.js
+          grep -Fq "const CACHE='riderhub-v27'" sw.js
       - name: Check approved UX contract
         run: |
           node - <<'NODE'
