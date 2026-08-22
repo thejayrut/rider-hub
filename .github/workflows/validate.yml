@@ -70,7 +70,7 @@ jobs:
           grep -Fq 'approved-runtime-fixes.js' index.html
           grep -Fq 'auth-flow-controller.js' index.html
           grep -Fq 'auth-flow-controller.js' sw.js
-          grep -Fq "const CACHE='riderhub-v28'" sw.js
+          grep -Fq "const CACHE='riderhub-v29'" sw.js
       - name: Check approved UX contract
         run: |
           node - <<'NODE'
