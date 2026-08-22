@@ -24,6 +24,7 @@ jobs:
       - run: node --check firebase-ui-bridge.js
       - run: node --check motorcycle-catalog.js
       - run: node --check approved-changes.js
+      - run: node --check approved-runtime-fixes.js
       - run: node --check sw.js
       - name: Check Firebase module syntax
         run: |
@@ -53,14 +54,16 @@ jobs:
           test -s stability-hotfix.js
           test -s motorcycle-catalog.js
           test -s approved-changes.js
+          test -s approved-runtime-fixes.js
           test -s icon-192.svg
           test -s icon-512.svg
           test -s icon-maskable.svg
           grep -Fq 'approved-changes.css' index.html
           grep -Fq 'motorcycle-catalog.js' index.html
           grep -Fq 'approved-changes.js' index.html
-          grep -Fq 'approved-changes.js' sw.js
-          grep -Fq "const CACHE='riderhub-v24'" sw.js
+          grep -Fq 'approved-runtime-fixes.js' index.html
+          grep -Fq 'approved-runtime-fixes.js' sw.js
+          grep -Fq "const CACHE='riderhub-v25'" sw.js
       - name: Reject obsolete runtime layers
         run: |
           test ! -e cloud-sync-fix.js
@@ -82,9 +85,6 @@ jobs:
           fi
       - name: Reject non-Firebase Google API keys
         run: |
-          # Firebase Web apiKey values are public browser identifiers by design,
-          # so firebase-config.js is intentionally excluded. Other Google API
-          # keys must not be committed to the repository.
           if grep -R -n --exclude-dir=.git --exclude=firebase-config.js 'AIza[0-9A-Za-z_-]\{20,\}' . 2>/dev/null; then
             echo 'Non-Firebase Google API keys must stay device-local or server-side.'
             exit 1
