@@ -4,6 +4,7 @@ import App from './App'
 import { RiderHubProvider } from './store/RiderHubProvider'
 import './styles.css'
 import './phase3-polish.css'
+import './controls.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
