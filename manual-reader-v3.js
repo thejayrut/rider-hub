@@ -24,18 +24,18 @@ function pressureValue(segment,pos){
 }
 function pressurePair(segment){return{front:pressureValue(segment,'front'),rear:pressureValue(segment,'rear')}}
 function pagePressure(page){
-  const t=clean(page),low=t.toLowerCase();
-  if(!/(tyre|tire).{0,80}pressure|pressure.{0,80}(tyre|tire)/i.test(t))return null;
+  const t=clean(page);
+  if(!/(tyre|tire).{0,100}pressure|pressure.{0,100}(tyre|tire)/i.test(t))return null;
   const blocks=[];
   const labels=[
     ['pillion',/(?:with\s+(?:a\s+)?pillion|rider\s*(?:and|\+)\s*pillion|two\s+persons?|2\s+persons?|fully\s+loaded|laden|maximum\s+load)/ig],
     ['solo',/(?:without\s+pillion|rider\s+only|one\s+person|1\s+person|solo|unladen)/ig]
   ];
   for(const [kind,re] of labels){
-    let m;while((m=re.exec(t))){blocks.push({kind,start:Math.max(0,m.index-320),end:Math.min(t.length,m.index+520)})}
+    let m;while((m=re.exec(t))){blocks.push({kind,start:m.index,end:Math.min(t.length,m.index+440)})}
   }
   const out={solo:{front:'',rear:''},pillion:{front:'',rear:''}};
-  for(const b of blocks){const pair=pressurePair(t.slice(b.start,b.end));if(pair.front)out[b.kind].front=pair.front;if(pair.rear)out[b.kind].rear=pair.rear}
+  for(const b of blocks){const pair=pressurePair(t.slice(b.start,b.end));if(pair.front&&!out[b.kind].front)out[b.kind].front=pair.front;if(pair.rear&&!out[b.kind].rear)out[b.kind].rear=pair.rear}
   if(!out.solo.front&&!out.solo.rear&&!out.pillion.front&&!out.pillion.rear){
     const pair=pressurePair(t);out.solo=pair;
   }
