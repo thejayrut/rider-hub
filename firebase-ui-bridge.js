@@ -61,6 +61,15 @@ new MutationObserver(patchAuthStage).observe(document.documentElement,{subtree:t
 patchAuthStage();
 setTimeout(patchAuthStage,120);setTimeout(patchAuthStage,700);
 
+/* The GitHub Pages fallback intentionally does not retry the Android popup that
+   produced about:blank. Mobile cloud auth starts only on Firebase Hosting. */
+document.addEventListener('click',event=>{
+ const button=event.target.closest?.('#rhGoogleFirebaseLogin');
+ if(!button||!previewAllowed()||!/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent||''))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const n=document.querySelector('#rhAuthNote');if(n){n.className='rh-auth-note warn';n.textContent='Mobile Google Sign-In is disabled on the GitHub Pages fallback. Use local preview here; cloud sign-in starts on Firebase Hosting.'}
+},true);
+
 window.openCloudSetup=function(){
  const c=typeof window.riderHubCloudConfig==='function'?window.riderHubCloudConfig():{};const label=cloudLabel();
  if(typeof window.openModal!=='function')return;
