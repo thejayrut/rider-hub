@@ -70,7 +70,7 @@ jobs:
           grep -Fq 'approved-runtime-fixes.js' index.html
           grep -Fq 'auth-flow-controller.js' index.html
           grep -Fq 'auth-flow-controller.js' sw.js
-          grep -Fq "const CACHE='riderhub-v27'" sw.js
+          grep -Fq "const CACHE='riderhub-v28'" sw.js
       - name: Check approved UX contract
         run: |
           node - <<'NODE'
@@ -102,6 +102,7 @@ jobs:
           if(!runtime.includes('UserManual2026/TVS-Ronin.pdf')||!runtime.includes('hunter-350-dual-channel.pdf')) throw new Error('Verified owner manual links missing');
           if(!publicLayer.includes('bikeConfigured:false')||!publicLayer.includes('s.gear=[]')||!publicLayer.includes('USER_PREFIX')) throw new Error('Clean per-user workspace contract missing');
           if(!approved.includes("location.hostname===CANONICAL_HOST&&!publicUser()")) throw new Error('Starter-state migration guard missing');
+          if(!runtime.includes("localStorage.getItem('riderhub_v6')")) throw new Error('Saved legacy migration recovery missing');
           if(!auth.includes('riderHubRequireBikeSetup')) throw new Error('Mandatory new-user motorcycle gate missing');
           NODE
       - name: Reject obsolete runtime layers
