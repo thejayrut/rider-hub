@@ -30,7 +30,7 @@ export async function validateMapsDemoKey(key:string){
 }
 
 export async function fetchCurrentWeather():Promise<WeatherSnapshot>{
-  const key=getMapsDemoKey();if(!key)throw new Error('Maps Demo Key not connected')
+  const key=getMapsDemoKey();if(!key)throw new Error('Weather & Maps not connected')
   const q=new URLSearchParams({'key':key,'location.latitude':String(BANSWARA.lat),'location.longitude':String(BANSWARA.lng),'unitsSystem':'METRIC'})
   const j=await getJson(`https://weather.googleapis.com/v1/currentConditions:lookup?${q}`)
   return {
@@ -46,7 +46,7 @@ export async function fetchCurrentWeather():Promise<WeatherSnapshot>{
 }
 
 export async function fetchDailyWeather():Promise<DailyWeather[]>{
-  const key=getMapsDemoKey();if(!key)throw new Error('Maps Demo Key not connected')
+  const key=getMapsDemoKey();if(!key)throw new Error('Weather & Maps not connected')
   const q=new URLSearchParams({'key':key,'location.latitude':String(BANSWARA.lat),'location.longitude':String(BANSWARA.lng),'unitsSystem':'METRIC','days':'10','pageSize':'10'})
   const j=await getJson(`https://weather.googleapis.com/v1/forecast/days:lookup?${q}`)
   return (j.forecastDays??[]).map((x:any)=>({
@@ -59,13 +59,13 @@ export async function fetchDailyWeather():Promise<DailyWeather[]>{
 }
 
 async function compute(segment:RouteSegment,trafficAware:boolean):Promise<RouteIntel>{
-  const key=getMapsDemoKey();if(!key)throw new Error('Maps Demo Key not connected')
+  const key=getMapsDemoKey();if(!key)throw new Error('Weather & Maps not connected')
   const body:any={origin:{address:segment.origin},destination:{address:segment.destination},intermediates:segment.waypoints.map(address=>({address})),travelMode:'DRIVE',routingPreference:trafficAware?'TRAFFIC_AWARE':'TRAFFIC_UNAWARE',polylineQuality:'OVERVIEW'}
   if(trafficAware)body.extraComputations=['TRAFFIC_ON_POLYLINE']
   const j=await getJson('https://routes.googleapis.com/directions/v2:computeRoutes',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':key,'X-Goog-FieldMask':'routes.duration,routes.distanceMeters,routes.travelAdvisory.speedReadingIntervals'},body:JSON.stringify(body)})
   const r=j.routes?.[0];if(!r)throw new Error('No route returned')
   const seconds=Number(String(r.duration??'0s').replace('s',''))||0
-  return {distanceKm:(r.distanceMeters??0)/1000,durationMin:seconds/60,mode:trafficAware?'traffic-aware':'basic',notice:trafficAware?'Traffic-aware ETA from Google Routes prototype.':'Basic route estimate; live traffic unavailable for this request.'}
+  return {distanceKm:(r.distanceMeters??0)/1000,durationMin:seconds/60,mode:trafficAware?'traffic-aware':'basic',notice:trafficAware?'Traffic-aware ETA available.':'Route estimate available. Live traffic timing is not available for this route right now.'}
 }
 
 export async function computeRouteIntel(segment:RouteSegment):Promise<RouteIntel>{
