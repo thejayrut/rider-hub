@@ -16,5 +16,7 @@ assert(fixes.includes('WITH PILLION · FRONT')&&fixes.includes('SOLO · FRONT'),
 assert(css.includes('@media(min-width:900px)')&&css.includes('max-width:1180px')&&css.includes('.bottomnav{left:0;top:0;bottom:0'),'desktop workspace layout missing');
 assert(index.includes('rh-preboot')&&index.includes('v32-fast-start.js')&&index.includes('v32-fixes.js')&&index.includes('manual-reader-v3.js')&&index.includes('v32-ui.css'),'v32 assets not wired');
 assert(sw.includes("const CACHE='riderhub-v32'")&&sw.includes('v32-fast-start.js'),'v32 service-worker cache missing');
+assert(sw.includes("const cached=await caches.match(req)")&&sw.includes('event.waitUntil(network.catch(()=>{}))'),'static assets are not cache-first');
+assert(sw.includes('Promise.race([network,delay(1400)])'),'navigation network wait is not bounded');
 assert(del.includes('recent(user)')&&!del.includes('await window.requestDriveAccess'),'delete account still blocks on Drive reconnect');
 console.log('v32 UX/performance contract: PASS');
