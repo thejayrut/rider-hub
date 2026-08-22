@@ -1,8 +1,8 @@
-const CACHE='riderhub-v21';
+const CACHE='riderhub-v22';
 const ASSETS=[
-  './','./index.html','./styles.css','./phase2e-restore.css','./phase3-live.css','./phase3-account.css','./firebase-account.css','./phase4-personalization.css',
+  './','./index.html','./styles.css','./phase2e-restore.css','./phase3-live.css','./phase3-account.css','./firebase-account.css',
   './app.js','./enhancements.js','./phase2e-restore.js','./maps-demo.js','./cloud-sync.js','./phase3-live.js','./phase3-account.js',
-  './phase3-public.js','./phase4-personalization.js','./firebase-ui-bridge.js','./firebase-config.js','./firebase-auth.js','./privacy.html','./terms.html','./manifest.webmanifest',
+  './phase3-public.js','./firebase-ui-bridge.js','./firebase-config.js','./firebase-auth.js','./privacy.html','./terms.html','./manifest.webmanifest',
   './icon-192.svg','./icon-512.svg','./icon-maskable.svg'
 ];
 
