@@ -4,6 +4,7 @@
 (()=>{
 'use strict';
 const AUTH_KEY='riderhub_auth_session_v1';
+const REDIRECT_KEY='riderhub_firebase_redirect_pending_v1';
 const SLIDES=[
   {k:'YOUR MOTORCYCLE OS',h:'Everything around your motorcycle, in one place.',p:'Keep your bike information, maintenance, service history, gear and private documents organised around the motorcycle you actually ride.',f:[['Your bike','A workspace that adapts to your motorcycle.'],['Ownership','Odometer, service history and documents stay together.']]},
   {k:'RIDE MODE',h:'Plan less while riding. Miss less when tired.',p:'Ride plans, progress, emergency tools, notes and packing stay easy to reach when you are on the road.',f:[['Ride progress','Track what is done, delayed or skipped.'],['Road-ready','Keep the important controls close during a ride.']],highlight:['PRIVATE FILES STAY YOURS','Connect Google Drive once and Rider Hub backs up owner manuals and private documents to a visible Rider Hub folder in your own Google Drive. Rider Hub only requests access to the files you use with the app.']},
@@ -18,10 +19,16 @@ const firebaseUser=()=>typeof window.riderHubFirebaseUser==='function'?window.ri
 const publicUser=()=>!!window.state?.profile?.publicUser;
 const bikeConfigured=()=>!!window.state?.profile?.bikeConfigured;
 const manualNeeded=()=>typeof window.riderHubManualSetupNeeded==='function'&&window.riderHubManualSetupNeeded();
+const transition=()=>!!window.RIDER_HUB_AUTH_TRANSITION||!!(typeof sessionStorage!=='undefined'&&sessionStorage.getItem(REDIRECT_KEY));
 
 function genericBrand(){
   const small=document.querySelector('#rhAuthShell .rh-auth-brand small');
   if(small)small.textContent='MOTORCYCLE OS';
+}
+function renderOpening(){
+  const sh=shell(),st=stage();if(!sh||!st)return;
+  mode='opening';genericBrand();sh.classList.add('active');
+  st.innerHTML='<div class="rh-auth-opening"><div class="rh-slide-kicker">RIDER HUB</div><h2>Opening your Rider Hub…</h2><p>Loading your motorcycle, rides, gear and saved workspace.</p><div class="rh-auth-opening-bar"><i></i></div></div>';
 }
 function renderWelcome(i=index){
   const sh=shell(),st=stage();if(!sh||!st)return;
@@ -38,14 +45,17 @@ window.rhApprovedWelcomeBack=()=>renderWelcome(index-1);
 window.rhApprovedWelcomeNext=()=>index===SLIDES.length-1?renderLogin():renderWelcome(index+1);
 window.rhAuthShowWelcome=()=>renderWelcome(0);
 window.rhAuthShowLogin=()=>renderLogin();
+window.rhAuthShowOpening=renderOpening;
 window.riderHubAuthFlowMode=()=>mode;
 window.riderHubAuthSlideIndex=()=>index;
 
 function restoreSignedOutUi(){
   if(firebaseUser())return;
+  if(transition()){renderOpening();return}
   if(mode==='login')renderLogin();else renderWelcome(index);
 }
 function enforceSignedInGate(){
+  if(transition())return;
   if(!firebaseUser())return;
   if(publicUser()&&!bikeConfigured()){
     mode='setup';
@@ -62,6 +72,10 @@ function enforceSignedInGate(){
 
 window.addEventListener('riderhub-sync-status',event=>{
   const kind=String(event?.detail?.kind||'');
+  if(transition()){
+    renderOpening();
+    return;
+  }
   if(kind==='signedout'){
     queueMicrotask(restoreSignedOutUi);
     setTimeout(restoreSignedOutUi,30);
@@ -75,15 +89,16 @@ window.addEventListener('riderhub-sync-status',event=>{
     return;
   }
   if(kind==='loading'||kind==='syncing')return;
-  setTimeout(enforceSignedInGate,30);
+  setTimeout(enforceSignedInGate,0);
 });
 
 function hasRememberedFirebaseSession(){
   try{const s=JSON.parse(localStorage.getItem(AUTH_KEY)||'null');return !!(s&&s.provider==='firebase'&&s.uid)}catch{return false}
 }
 genericBrand();
-if(!hasRememberedFirebaseSession()){
+if(transition())renderOpening();
+else if(!hasRememberedFirebaseSession()){
   renderWelcome(0);
-  setTimeout(()=>{if(!firebaseUser()&&mode==='welcome')renderWelcome(index)},140);
+  setTimeout(()=>{if(!firebaseUser()&&mode==='welcome'&&!transition())renderWelcome(index)},140);
 }
 })();
