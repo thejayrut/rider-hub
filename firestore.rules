@@ -2,15 +2,52 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function owns(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function validProfile() {
+      return request.resource.data.keys().hasOnly([
+               'displayName', 'email', 'photoURL', 'lastLoginAt'
+             ])
+             && request.resource.data.displayName is string
+             && request.resource.data.email is string
+             && request.resource.data.photoURL is string;
+    }
+
+    function validRiderHubState() {
+      return request.resource.data.keys().hasOnly([
+               'schema', 'revision', 'clientId', 'state',
+               'clientUpdatedAt', 'updatedAt'
+             ])
+             && request.resource.data.schema is int
+             && request.resource.data.schema >= 3
+             && request.resource.data.revision is int
+             && request.resource.data.revision >= 1
+             && request.resource.data.clientId is string
+             && request.resource.data.clientId.size() <= 128
+             && request.resource.data.state is map
+             && request.resource.data.clientUpdatedAt is int;
+    }
 
     match /users/{userId} {
-      allow read, write: if request.auth != null
-                         && request.auth.uid == userId;
+      allow read: if owns(userId);
+      allow create, update: if owns(userId) && validProfile();
+      allow delete: if false;
+
+      match /riderhub/state {
+        allow read: if owns(userId);
+        allow create, update: if owns(userId) && validRiderHubState();
+        allow delete: if false;
+      }
 
       match /{document=**} {
-        allow read, write: if request.auth != null
-                           && request.auth.uid == userId;
+        allow read, write: if false;
       }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
