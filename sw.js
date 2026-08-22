@@ -1,1 +1,52 @@
-const C='riderhub-v15';const ASSETS=['./','./index.html','./styles.css','./phase2e-restore.css','./phase3-live.css','./phase3-account.css','./app.js','./enhancements.js','./phase2e-restore.js','./maps-demo.js','./cloud-sync.js','./cloud-sync-fix.js','./phase3-live.js','./phase3-account.js','./phase3-public.js','./firebase-config.js','./firebase-auth.js','./privacy.html','./terms.html','./manifest.webmanifest'];self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(fetch(e.request).then(resp=>{const copy=resp.clone();caches.open(C).then(c=>c.put(e.request,copy));return resp}).catch(()=>caches.match(e.request).then(r=>r||caches.match('./index.html'))))});
+const CACHE='riderhub-v16';
+const ASSETS=[
+  './','./index.html','./styles.css','./phase2e-restore.css','./phase3-live.css','./phase3-account.css',
+  './app.js','./enhancements.js','./phase2e-restore.js','./maps-demo.js','./cloud-sync.js','./cloud-sync-fix.js',
+  './phase3-live.js','./phase3-account.js','./phase3-public.js','./firebase-config.js','./firebase-auth.js',
+  './privacy.html','./terms.html','./manifest.webmanifest'
+];
+
+self.addEventListener('install',event=>{
+  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
+});
+
+self.addEventListener('activate',event=>{
+  event.waitUntil(
+    caches.keys()
+      .then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key))))
+      .then(()=>self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch',event=>{
+  const req=event.request;
+  if(req.method!=='GET')return;
+
+  const url=new URL(req.url);
+
+  /* Never intercept Firebase SDK, Google Identity, Drive API, maps, weather or
+     any other cross-origin request. Serving cached HTML as a failed module/API
+     response can break authentication and produce hard-to-debug blank screens. */
+  if(url.origin!==self.location.origin)return;
+
+  if(req.mode==='navigate'){
+    event.respondWith(
+      fetch(req)
+        .then(resp=>{
+          if(resp&&resp.ok)caches.open(CACHE).then(cache=>cache.put('./index.html',resp.clone())).catch(()=>{});
+          return resp;
+        })
+        .catch(()=>caches.match('./index.html'))
+    );
+    return;
+  }
+
+  event.respondWith(
+    fetch(req)
+      .then(resp=>{
+        if(resp&&resp.ok)caches.open(CACHE).then(cache=>cache.put(req,resp.clone())).catch(()=>{});
+        return resp;
+      })
+      .catch(()=>caches.match(req))
+  );
+});
