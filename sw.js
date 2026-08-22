@@ -1,8 +1,8 @@
-const CACHE='riderhub-v30';
+const CACHE='riderhub-v31';
 const ASSETS=[
-  './','./index.html','./styles.css','./phase2e-restore.css','./phase3-live.css','./phase3-account.css','./firebase-account.css','./approved-changes.css','./confirmed-features.css',
+  './','./index.html','./styles.css','./phase2e-restore.css','./phase3-live.css','./phase3-account.css','./firebase-account.css','./approved-changes.css','./confirmed-features.css','./final-polish.css',
   './app.js','./enhancements.js','./phase2e-restore.js','./maps-demo.js','./cloud-drive-v2.js','./phase3-live.js','./phase3-account.js',
-  './phase3-public.js','./state-bridge.js','./stability-hotfix.js','./firebase-ui-bridge.js','./motorcycle-catalog.js','./approved-changes.js','./approved-runtime-fixes.js','./manual-reader.js','./confirmed-features.js','./auth-flow-controller.js','./firebase-config.js','./firebase-auth.js','./firebase-account-delete.js','./privacy.html','./terms.html','./manifest.webmanifest',
+  './phase3-public.js','./state-bridge.js','./stability-hotfix.js','./firebase-ui-bridge.js','./motorcycle-catalog.js','./auth-transition-guard.js','./approved-changes.js','./approved-runtime-fixes.js','./manual-reader.js','./confirmed-features.js','./manual-reader-v2.js','./ride-pdf-importer.js','./ride-mode-v2.js','./final-polish.js','./auth-flow-controller.js','./firebase-config.js','./firebase-auth.js','./firebase-account-delete.js','./privacy.html','./terms.html','./manifest.webmanifest',
   './icon-192.svg','./icon-512.svg','./icon-maskable.svg'
 ];
 
