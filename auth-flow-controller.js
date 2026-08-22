@@ -58,18 +58,18 @@ window.addEventListener('riderhub-sync-status',event=>{
   const kind=String(event?.detail?.kind||'');
   if(kind==='signedout'){
     queueMicrotask(restoreSignedOutUi);
-    setTimeout(restoreSignedOutUi,30);
+    setTimeout(restoreSignedOutUi,0);
     return;
   }
   if(kind==='error'&&!firebaseUser()){
     setTimeout(()=>{
       if(mode==='login')renderLogin('Sign-in could not start. Check your connection and reload Rider Hub.',true);
       else restoreSignedOutUi();
-    },30);
+    },0);
     return;
   }
   if(kind==='loading'||kind==='syncing')return;
-  setTimeout(enforceSignedInGate,30);
+  setTimeout(enforceSignedInGate,0);
 });
 
 function hasRememberedFirebaseSession(){
