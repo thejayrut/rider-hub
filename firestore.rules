@@ -33,12 +33,12 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if owns(userId);
       allow create, update: if owns(userId) && validProfile();
-      allow delete: if false;
+      allow delete: if owns(userId);
 
       match /riderhub/state {
         allow read: if owns(userId);
         allow create, update: if owns(userId) && validRiderHubState();
-        allow delete: if false;
+        allow delete: if owns(userId);
       }
 
       match /{document=**} {
