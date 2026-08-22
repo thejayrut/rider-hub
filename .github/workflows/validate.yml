@@ -19,7 +19,11 @@ jobs:
       - run: node --check phase3-live.js
       - run: node --check phase3-account.js
       - run: node --check phase3-public.js
+      - run: node --check state-bridge.js
+      - run: node --check stability-hotfix.js
       - run: node --check firebase-ui-bridge.js
+      - run: node --check motorcycle-catalog.js
+      - run: node --check approved-changes.js
       - run: node --check sw.js
       - name: Check Firebase module syntax
         run: |
@@ -44,14 +48,26 @@ jobs:
           test -s phase3-live.css
           test -s phase3-account.css
           test -s firebase-account.css
+          test -s approved-changes.css
+          test -s state-bridge.js
+          test -s stability-hotfix.js
+          test -s motorcycle-catalog.js
+          test -s approved-changes.js
           test -s icon-192.svg
           test -s icon-512.svg
           test -s icon-maskable.svg
+          grep -Fq 'approved-changes.css' index.html
+          grep -Fq 'motorcycle-catalog.js' index.html
+          grep -Fq 'approved-changes.js' index.html
+          grep -Fq 'approved-changes.js' sw.js
+          grep -Fq "const CACHE='riderhub-v24'" sw.js
       - name: Reject obsolete runtime layers
         run: |
           test ! -e cloud-sync-fix.js
           test ! -e preview-mode.js
-          ! grep -Eq 'cloud-sync-fix\.js|preview-mode\.js' index.html sw.js
+          test ! -e phase4-personalization.js
+          test ! -e phase4-personalization.css
+          ! grep -Eq 'cloud-sync-fix\.js|preview-mode\.js|phase4-personalization' index.html sw.js
       - name: Protect Firebase auth reserved namespace
         run: |
           grep -Fq "url.pathname.startsWith('/__/')" sw.js || {
