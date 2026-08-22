@@ -1,4 +1,4 @@
-const CACHE='riderhub-v26';
+const CACHE='riderhub-v27';
 const ASSETS=[
   './','./index.html','./styles.css','./phase2e-restore.css','./phase3-live.css','./phase3-account.css','./firebase-account.css','./approved-changes.css',
   './app.js','./enhancements.js','./phase2e-restore.js','./maps-demo.js','./cloud-sync.js','./phase3-live.js','./phase3-account.js',
