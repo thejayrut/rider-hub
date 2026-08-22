@@ -1,0 +1,39 @@
+/* Rider Hub v32 responsive/UI consistency layer. */
+html.rh-preboot body{visibility:hidden}
+#home .rh-page-undo,#more .rh-page-undo,#docs .rh-page-undo{display:none!important}
+.rh-auth-opening-v32{width:min(520px,100%);padding:26px;border:1px solid var(--line);border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.018),transparent),var(--surface);box-shadow:0 22px 70px rgba(0,0,0,.34)}
+.rh-auth-opening-v32 h2{font-size:30px!important;line-height:1.08;margin:8px 0 10px!important}.rh-auth-opening-v32 p{font-size:11px!important;line-height:1.65!important;color:var(--muted)!important;max-width:430px}.rh-opening-emblem{width:48px;height:52px;display:grid;place-items:center;clip-path:polygon(50% 0,94% 14%,87% 69%,50% 100%,13% 69%,6% 14%);background:var(--surface2);border:1px solid var(--line);color:var(--ember);font-weight:950;margin-bottom:18px}.rh-opening-dots{display:flex;gap:7px;margin-top:20px}.rh-opening-dots i{width:7px;height:7px;border-radius:50%;background:var(--ember);animation:rhDots 1s ease-in-out infinite}.rh-opening-dots i:nth-child(2){animation-delay:.14s}.rh-opening-dots i:nth-child(3){animation-delay:.28s}@keyframes rhDots{0%,100%{opacity:.28;transform:translateY(0)}50%{opacity:1;transform:translateY(-4px)}}.rh-cloud-timeout{border-color:rgba(228,105,95,.25)}
+.rh-service-actions,.rh-bike-head-actions{display:flex;align-items:center;gap:8px}.rh-service-actions .secondary,.rh-bike-head-actions .secondary{height:36px}.rh-service-record{transition:border-color .15s ease,background .15s ease}.rh-service-record:hover{background:var(--surface2)}
+.rh-maintenance-v31 .listrow,.rh-document-vault .listrow{min-height:72px}.rh-maintenance-v31 .listrow>div:nth-child(2),.rh-document-vault .listrow>div:nth-child(2){min-width:0}.rh-row-action{white-space:nowrap}.rh-doc-storage-note{line-height:1.5}.rh-more-documents{margin-top:10px}
+.modal-actions>*{min-width:0}.card,.routecard,.listrow,.info,.tile,.stat,.more-card,.gear-card{transition:border-color .15s ease,background-color .15s ease,transform .15s ease}.more-card:hover,.gear-card:hover{border-color:#3a3e44}.primary:focus-visible,.secondary:focus-visible,.confirm:focus-visible,.danger:focus-visible,.round:focus-visible,.navbtn:focus-visible,.ridebtn:focus-visible,.more-card:focus-visible,.gear-card:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
+
+@media(min-width:900px){
+  body{padding-left:92px}
+  .shell{max-width:1180px;padding:0 28px 72px;margin:0 auto}
+  .header{padding-top:18px;padding-bottom:16px}
+  main{width:100%}
+  .bottomnav{left:0;top:0;bottom:0;transform:none;width:92px;height:100vh;padding:22px 9px;display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:8px;background:linear-gradient(90deg,#08090a 72%,rgba(8,9,10,.88),transparent)}
+  .bottomnav .navbtn{width:100%;height:66px;border-radius:16px;flex:0 0 auto}
+  .bottomnav .navbtn:hover{background:var(--surface)}
+  .bottomnav .ridebtn{width:58px;height:58px;margin:6px auto;flex:0 0 auto}
+  .hero{min-height:300px;padding:28px}.hero h1{font-size:34px;max-width:520px}.bikeplate{left:22px;right:22px;bottom:22px;padding:18px}
+  .quickgrid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.quick,.tool{min-height:84px}
+  .bike-info-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.info{min-height:82px;padding:15px}.info b{font-size:13px}
+  .rh-maintenance-v31 .card.list,.rh-document-vault .card.list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 1px;background:var(--line)}.rh-maintenance-v31 .listrow,.rh-document-vault .listrow{background:var(--surface);border-top:0;margin:0}
+  .ride-summary{grid-template-columns:repeat(3,1fr);gap:12px}.rh-rides-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.rh-ride-v2-card{height:100%}
+  .gear-summary{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.gear-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.gear-card{height:100%;border:1px solid var(--line);border-radius:16px}
+  .more-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.more-card{min-height:104px;padding:16px}.rh-more-hero-final{display:grid;grid-template-columns:1fr minmax(230px,320px);align-items:center;gap:20px;padding:24px}
+  .toolgrid.ride-toolkit{grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}.rideMode{padding:24px 30px 80px 122px}.rideModeInner{max-width:1180px}.rideMode .tool{min-height:92px}
+  .modalwrap{align-items:center;padding:24px}.modal{width:min(760px,calc(100vw - 150px));max-height:84vh;border-radius:24px;padding:18px 22px 24px}.modalhead{top:-18px;padding-top:10px}.modal-actions{grid-template-columns:1fr 1.35fr}
+  .rh-auth-inner{max-width:900px!important}.rh-auth-stage{max-width:720px!important}.rh-auth-opening-v32{margin-top:10px}
+  .rh-sos-contact{grid-template-columns:44px minmax(0,1fr) auto auto}.rh-social-row{grid-template-columns:repeat(3,1fr)}
+}
+@media(min-width:1240px){
+  .shell{max-width:1280px;padding-left:36px;padding-right:36px}.bike-info-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.gear-list{grid-template-columns:repeat(3,minmax(0,1fr))}.rh-rides-list{grid-template-columns:repeat(3,minmax(0,1fr))}.more-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:899px){
+  .rh-service-actions .secondary{height:34px;padding:0 10px}.rh-maintenance-v31 .listrow{grid-template-columns:42px minmax(0,1fr) auto}.rh-document-vault .listrow{grid-template-columns:42px minmax(0,1fr) auto}.rh-auth-opening-v32{padding:20px}.rh-auth-opening-v32 h2{font-size:27px!important}
+}
+@media(max-width:480px){
+  .rh-maintenance-v31 .listrow{grid-template-columns:38px minmax(0,1fr)}.rh-maintenance-v31 .rh-row-action{grid-column:2;width:100%}.rh-service-actions{margin-left:auto}.rh-service-actions .secondary{font-size:9px}.rh-auth-opening-v32{border-radius:20px}.rh-auth-opening-v32 p{font-size:10px!important}
+}
