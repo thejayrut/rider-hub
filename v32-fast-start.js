@@ -5,6 +5,7 @@
 (()=>{
 'use strict';
 const AUTH_KEY='riderhub_auth_session_v1';
+const REDIRECT_KEY='riderhub_firebase_redirect_pending_v1';
 const USER_PREFIX='riderhub_public_state_v1_';
 let waitTimer=0;
 let waitingForCloud=false;
@@ -43,11 +44,14 @@ function markWaiting(on){
 function showCloudTimeout(){
   const sh=shell(),st=stage();if(!sh||!st)return;
   sh.classList.add('active');
-  st.innerHTML='<div class="rh-auth-opening rh-auth-opening-v32 rh-cloud-timeout"><div class="rh-opening-emblem">RH</div><div class="rh-slide-kicker">RIDER HUB</div><h2>We could not reach your saved workspace.</h2><p>Your account is signed in, but this device has no local Rider Hub copy and the cloud check took too long. Nothing was overwritten.</p><div class="rh-auth-actions"><button type="button" class="secondary" onclick="location.reload()">Retry</button></div></div>';
+  st.innerHTML='<div class="rh-auth-opening rh-auth-opening-v32 rh-cloud-timeout"><div class="rh-opening-emblem">RH</div><div class="rh-slide-kicker">RIDER HUB</div><h2>This is taking longer than it should.</h2><p>Rider Hub stopped the blocking wait. Retry the account check; your saved data has not been overwritten.</p><div class="rh-auth-actions"><button type="button" class="primary" onclick="location.reload()">Retry</button></div></div>';
 }
 function bootCachedSession(){
   const s=session(),uid=s?.provider==='firebase'&&s?.uid?s.uid:'';
-  if(!uid)return false;
+  if(!uid){
+    if(sessionStorage.getItem(REDIRECT_KEY)){markWaiting(true);setTimeout(()=>window.riderHubShowAuthOpening?.(),0)}
+    return false;
+  }
   const cached=cachedFor(uid);
   if(!cached?.profile?.publicUser){markWaiting(true);setTimeout(()=>window.riderHubShowAuthOpening?.(),0);return false}
   markWaiting(false);unresolved=false;window.RIDER_HUB_CLOUD_UNRESOLVED=false;
