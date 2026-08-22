@@ -1,0 +1,19 @@
+/* Confirmed Rider Hub product polish: dynamic accent, manual/document UX, delete-account state. */
+:root{--rh-accent:var(--ember)}
+.ridebtn{background:linear-gradient(160deg,var(--ember2),var(--ember));box-shadow:0 8px 24px color-mix(in srgb,var(--ember) 28%,transparent)}
+.rh-auth-highlight{margin-top:18px;padding:14px 15px;border:1px solid color-mix(in srgb,var(--ember) 36%,#30343a);border-radius:16px;background:color-mix(in srgb,var(--ember) 10%,#101214);display:grid;gap:5px}
+.rh-auth-highlight strong{font-size:12px;color:var(--text)}
+.rh-auth-highlight span{font-size:11px;line-height:1.5;color:#b7bbc0}
+.rh-other-manufacturers{margin-top:8px}.rh-other-manufacturers label{display:block;font-size:7px;color:var(--muted2);letter-spacing:.08em;margin-bottom:6px}.rh-other-manufacturers select{width:100%;border:1px solid #363a40;background:#0b0d0f;color:#fff;border-radius:13px;padding:11px}
+.rh-accent-control{display:flex;align-items:center;gap:10px;border:1px solid #363a40;background:#0b0d0f;border-radius:13px;padding:8px 10px}.rh-accent-control input[type=color]{width:42px;height:34px;padding:0;border:0;background:transparent;flex:0 0 auto}.rh-accent-control span{font-size:8.5px;line-height:1.35;color:var(--muted)}
+.rh-manual-why{margin-top:16px;padding:14px;border:1px solid color-mix(in srgb,var(--ember) 28%,var(--line));border-radius:16px;background:var(--soft)}.rh-manual-why strong{font-size:11px}.rh-manual-why p{font-size:10px!important;line-height:1.55!important;margin:6px 0 0!important;color:#c0b9ae!important}
+.rh-drive-inline{margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:14px;background:#0e1012;display:flex;gap:12px;align-items:center;justify-content:space-between}.rh-drive-inline.connected{border-color:rgba(111,191,122,.3)}.rh-drive-inline strong{display:block;font-size:10px}.rh-drive-inline span{display:block;font-size:8px;color:var(--muted);margin-top:3px}.rh-drive-inline button{height:36px;white-space:nowrap}
+.rh-manual-upload{margin-top:12px;display:grid;gap:8px}.rh-manual-upload .caption{text-align:center}
+.rh-bike-head-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}.rh-bike-head-actions button{height:36px}
+.rh-manual-missing{cursor:pointer;border-color:color-mix(in srgb,var(--ember) 30%,var(--line))}.rh-manual-missing b{color:var(--ember)}
+.rh-source-badge{display:block;margin-top:5px;color:var(--ember);font-size:7px;letter-spacing:.04em}
+.rh-manual-derived-card{margin-top:4px}.rh-manual-found{display:grid;gap:7px;margin-top:10px}.rh-manual-found>div{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:12px;padding:9px 10px}.rh-manual-found strong{font-size:9px;text-transform:capitalize}.rh-manual-found span{font-size:8px;color:var(--muted);text-align:right}
+.rh-more-documents{margin-top:9px}.rh-doc-storage-note{margin-top:9px;padding:11px 12px;border:1px solid var(--line);border-radius:13px;display:grid;gap:4px;background:#0d0f11}.rh-doc-storage-note strong{font-size:9px}.rh-doc-storage-note span{font-size:8px;line-height:1.4;color:var(--muted)}
+.rh-delete-account-card{border-color:rgba(228,105,95,.28)!important;background:rgba(228,105,95,.055)!important}.rh-delete-account-card>b,.rh-delete-account-card strong{color:#ef8d85!important}
+.rh-delete-confirm{margin-top:12px;padding:12px;border:1px solid rgba(228,105,95,.28);background:rgba(228,105,95,.06);border-radius:14px}.rh-delete-confirm strong{font-size:10px;color:#efaaa4}.rh-delete-confirm p{font-size:8.5px;line-height:1.5;color:#c5a4a1;margin:5px 0 0}
+@media(max-width:480px){.rh-bike-head-actions{width:100%;justify-content:flex-start}.section-head:has(.rh-bike-head-actions){align-items:flex-start;flex-wrap:wrap}.rh-drive-inline{align-items:stretch;flex-direction:column}.rh-drive-inline button{width:100%}}
