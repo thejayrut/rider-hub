@@ -16,7 +16,6 @@ jobs:
       - run: node --check phase2e-restore.js
       - run: node --check maps-demo.js
       - run: node --check cloud-sync.js
-      - run: node --check cloud-sync-fix.js
       - run: node --check phase3-live.js
       - run: node --check phase3-account.js
       - run: node --check phase3-public.js
@@ -28,8 +27,38 @@ jobs:
           node --check /tmp/firebase-auth.mjs
       - name: Validate JSON configuration
         run: |
-          node -e "JSON.parse(require('fs').readFileSync('manifest.webmanifest','utf8')); JSON.parse(require('fs').readFileSync('firebase.json','utf8')); JSON.parse(require('fs').readFileSync('.firebaserc','utf8'));"
-      - run: test -s index.html && test -s styles.css && test -s phase2e-restore.css && test -s phase3-live.css && test -s phase3-account.css
+          node - <<'NODE'
+          const fs=require('fs');
+          const manifest=JSON.parse(fs.readFileSync('manifest.webmanifest','utf8'));
+          JSON.parse(fs.readFileSync('firebase.json','utf8'));
+          JSON.parse(fs.readFileSync('.firebaserc','utf8'));
+          const sizes=new Set((manifest.icons||[]).map(x=>x.sizes));
+          if(!sizes.has('192x192')||!sizes.has('512x512')) throw new Error('PWA manifest needs 192x192 and 512x512 icons');
+          if(!manifest.start_url||!manifest.display) throw new Error('PWA manifest is missing start_url/display');
+          NODE
+      - name: Check required app assets
+        run: |
+          test -s index.html
+          test -s styles.css
+          test -s phase2e-restore.css
+          test -s phase3-live.css
+          test -s phase3-account.css
+          test -s firebase-account.css
+          test -s icon-192.svg
+          test -s icon-512.svg
+          test -s icon-maskable.svg
+      - name: Protect Firebase auth reserved namespace
+        run: |
+          grep -Fq "url.pathname.startsWith('/__/')" sw.js || {
+            echo 'Service worker must never intercept Firebase Hosting /__/ auth helpers.'
+            exit 1
+          }
+      - name: Keep Google Drive file-only
+        run: |
+          if grep -Eq 'riderhub_state_v1\.json|uploadState\(|downloadState\(' cloud-sync.js; then
+            echo 'Google Drive must not be a second Rider Hub app-state database.'
+            exit 1
+          fi
       - name: Reject non-Firebase Google API keys
         run: |
           # Firebase Web apiKey values are public browser identifiers by design,
@@ -41,7 +70,7 @@ jobs:
           fi
       - name: Reject private credentials
         run: |
-          if grep -R -n --exclude-dir=.git -E 'BEGIN (RSA |EC |)PRIVATE KEY|"private_key"[[:space:]]*:' . 2>/dev/null; then
+          if grep -R -n --exclude-dir=.git -E 'BEGIN (RSA |EC |)PRIVATE KEY|"private_key"[[:space:]]*:|"client_secret"[[:space:]]*:' . 2>/dev/null; then
             echo 'Private credentials must never be committed.'
             exit 1
           fi
