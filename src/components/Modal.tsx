@@ -6,9 +6,9 @@ export function Modal({open,onClose,children,title}:{open:boolean;onClose:()=>vo
     const prev=document.body.style.overflow
     document.body.style.overflow='hidden'
     history.pushState({...history.state,rhModal:true},'',location.href)
-    const onPop=()=>onClose()
-    window.addEventListener('popstate',onPop,{once:true})
-    return()=>{document.body.style.overflow=prev;window.removeEventListener('popstate',onPop)}
+    const onPop=(event:PopStateEvent)=>{event.stopImmediatePropagation();onClose()}
+    window.addEventListener('popstate',onPop,{once:true,capture:true})
+    return()=>{document.body.style.overflow=prev;window.removeEventListener('popstate',onPop,{capture:true})}
   },[open,onClose])
   if(!open)return null
   const close=()=>{if(history.state?.rhModal)history.back();else onClose()}
