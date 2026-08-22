@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { DEFAULT_STATE } from '../domain/defaultData'
 import { loadLegacyState } from '../lib/legacyBridge'
+import { markLocalModified } from '../services/googleDriveSync'
 import type { BikeIssue, ExpenseState, GearItem, RiderHubState, RideTaskStatus } from '../types'
 
 const STORAGE_KEY = 'riderhub_phase3_v1'
@@ -20,6 +21,7 @@ type Store = {
   canUndo: boolean
   lastChange: string
   undo: () => void
+  replaceState: (value:RiderHubState,label?:string) => void
   updateOdometer: (value:number) => void
   selectRideDay: (rideId:string, dayIndex:number) => void
   setTask: (rideId:string, dayIndex:number, taskId:string, status:RideTaskStatus) => void
@@ -41,8 +43,12 @@ export function RiderHubProvider({children}:{children:ReactNode}){
   const [state,setState] = useState<RiderHubState>(loadInitial)
   const [undoStack,setUndoStack] = useState<RiderHubState[]>([])
   const [lastChange,setLastChange] = useState('')
+  const firstPersist=useRef(true)
 
-  useEffect(()=>{ localStorage.setItem(STORAGE_KEY,JSON.stringify(state)) },[state])
+  useEffect(()=>{
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(state))
+    if(firstPersist.current){firstPersist.current=false}else markLocalModified()
+  },[state])
 
   const mutate = useCallback((label:string, fn:(next:RiderHubState)=>void)=>{
     setState(prev=>{
@@ -62,6 +68,10 @@ export function RiderHubProvider({children}:{children:ReactNode}){
       setLastChange('Undo')
       return stack.slice(0,-1)
     })
+  },[])
+
+  const replaceState=useCallback((value:RiderHubState,label='cloud sync')=>{
+    setState(prev=>{setUndoStack(stack=>[...stack.slice(-39),clone(prev)]);setLastChange(label);return clone(value)})
   },[])
 
   const updateOdometer=(value:number)=>mutate('odometer',next=>{next.bike.currentOdometer=Math.max(0,Math.round(value))})
@@ -100,7 +110,7 @@ export function RiderHubProvider({children}:{children:ReactNode}){
   const saveGear=(item:GearItem)=>mutate(state.gear.some(x=>x.id===item.id)?'edit gear':'add gear',next=>{const i=next.gear.findIndex(x=>x.id===item.id);if(i>=0)next.gear[i]=item;else next.gear.push(item)})
   const deleteGear=(id:string)=>mutate('delete gear',next=>{next.gear=next.gear.filter(x=>x.id!==id)})
 
-  const value=useMemo<Store>(()=>({state,canUndo:undoStack.length>0,lastChange,undo,updateOdometer,selectRideDay,setTask,delayTask,commitExpenses,addFuel,setNotes,addIssue,togglePreflight,toggleChecklist,setEmergencyContacts,saveGear,deleteGear}),[state,undoStack.length,lastChange,undo])
+  const value=useMemo<Store>(()=>({state,canUndo:undoStack.length>0,lastChange,undo,replaceState,updateOdometer,selectRideDay,setTask,delayTask,commitExpenses,addFuel,setNotes,addIssue,togglePreflight,toggleChecklist,setEmergencyContacts,saveGear,deleteGear}),[state,undoStack.length,lastChange,undo,replaceState])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
