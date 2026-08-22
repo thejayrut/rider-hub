@@ -1,9 +1,9 @@
-const CACHE='riderhub-v18';
+const CACHE='riderhub-v19';
 const ASSETS=[
-  './','./index.html','./styles.css','./phase2e-restore.css','./phase3-live.css','./phase3-account.css',
-  './app.js','./enhancements.js','./phase2e-restore.js','./maps-demo.js','./cloud-sync.js','./cloud-sync-fix.js',
-  './phase3-live.js','./phase3-account.js','./phase3-public.js','./firebase-ui-bridge.js','./firebase-config.js','./firebase-auth.js',
-  './preview-mode.js','./privacy.html','./terms.html','./manifest.webmanifest'
+  './','./index.html','./styles.css','./phase2e-restore.css','./phase3-live.css','./phase3-account.css','./firebase-account.css',
+  './app.js','./enhancements.js','./phase2e-restore.js','./maps-demo.js','./cloud-sync.js','./phase3-live.js','./phase3-account.js',
+  './phase3-public.js','./firebase-ui-bridge.js','./firebase-config.js','./firebase-auth.js','./privacy.html','./terms.html','./manifest.webmanifest',
+  './icon-192.svg','./icon-512.svg','./icon-maskable.svg'
 ];
 
 self.addEventListener('install',event=>{
@@ -21,13 +21,12 @@ self.addEventListener('activate',event=>{
 self.addEventListener('fetch',event=>{
   const req=event.request;
   if(req.method!=='GET')return;
-
   const url=new URL(req.url);
 
-  /* Never intercept Firebase SDK, Google Identity, Drive API, maps, weather or
-     any other cross-origin request. Serving cached HTML as a failed module/API
-     response can break authentication and produce hard-to-debug blank screens. */
-  if(url.origin!==self.location.origin)return;
+  /* Cross-origin requests belong to Firebase SDK, Google Identity/Drive, maps,
+     weather and other APIs. Firebase Hosting also reserves /__/ for auth helpers.
+     Never cache, replace or fallback either category. */
+  if(url.origin!==self.location.origin||url.pathname.startsWith('/__/'))return;
 
   if(req.mode==='navigate'){
     event.respondWith(
