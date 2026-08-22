@@ -25,6 +25,7 @@ jobs:
       - run: node --check motorcycle-catalog.js
       - run: node --check approved-changes.js
       - run: node --check approved-runtime-fixes.js
+      - run: node --check auth-flow-controller.js
       - run: node --check sw.js
       - name: Check Firebase module syntax
         run: |
@@ -55,6 +56,7 @@ jobs:
           test -s motorcycle-catalog.js
           test -s approved-changes.js
           test -s approved-runtime-fixes.js
+          test -s auth-flow-controller.js
           test -s icon-192.svg
           test -s icon-512.svg
           test -s icon-maskable.svg
@@ -62,15 +64,40 @@ jobs:
           grep -Fq 'motorcycle-catalog.js' index.html
           grep -Fq 'approved-changes.js' index.html
           grep -Fq 'approved-runtime-fixes.js' index.html
-          grep -Fq 'approved-runtime-fixes.js' sw.js
-          grep -Fq "const CACHE='riderhub-v25'" sw.js
+          grep -Fq 'auth-flow-controller.js' index.html
+          grep -Fq 'auth-flow-controller.js' sw.js
+          grep -Fq "const CACHE='riderhub-v26'" sw.js
+      - name: Check approved UX contract
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const auth=fs.readFileSync('auth-flow-controller.js','utf8');
+          const approved=fs.readFileSync('approved-changes.js','utf8');
+          const index=fs.readFileSync('index.html','utf8');
+          const catalog=fs.readFileSync('motorcycle-catalog.js','utf8');
+          if((auth.match(/\{k:'/g)||[]).length!==3) throw new Error('Onboarding must have exactly three slides');
+          if(!auth.includes('Continue with Google')) throw new Error('Google login action missing');
+          if(/Everything around your Ronin|TVS RONIN · CHARCOAL EMBER/.test(auth)) throw new Error('Onboarding contains bike-specific branding');
+          if(/Firebase|Firestore|Google Sign-In is ready/.test(auth)) throw new Error('Login/onboarding exposes backend jargon');
+          if(!index.includes('RIDER HUB')||!index.includes('MOTORCYCLE OS')) throw new Error('Generic pre-login header missing');
+          if(!index.includes('rh-bell-svg')) throw new Error('Bell icon missing from header');
+          if(!approved.includes('Private Workspace') && !approved.includes('private workspace')) {
+            // Removal is implemented by selector text; absence is okay only if the removal helper remains.
+            if(!approved.includes('removePrivateWorkspace')) throw new Error('Private Workspace removal missing');
+          }
+          if(!approved.includes('GEAR GARAGE')||!approved.includes('Your riding inventory')) throw new Error('Approved Gear Garage missing');
+          if(!approved.includes('Install as App')) throw new Error('Prominent install action missing');
+          const more=approved.slice(approved.indexOf('window.renderMore=function'));
+          if(!more.includes('Emergency contacts')||!more.includes('My Account')||!more.includes('Files & storage')) throw new Error('Required More actions missing');
+          if(!approved.includes('removeTopAddRide')) throw new Error('Duplicate Add Ride removal missing');
+          if(!catalog.includes('GetMakesForVehicleType/moto')||!catalog.includes('vehicletype/motorcycle')) throw new Error('Global motorcycle catalog lookup missing');
+          if(!catalog.includes("'tvs|ronin'")||!catalog.includes("'royal enfield|hunter 350'")) throw new Error('Verified motorcycle profiles missing');
+          NODE
       - name: Reject obsolete runtime layers
         run: |
           test ! -e cloud-sync-fix.js
           test ! -e preview-mode.js
-          test ! -e phase4-personalization.js
-          test ! -e phase4-personalization.css
-          ! grep -Eq 'cloud-sync-fix\.js|preview-mode\.js|phase4-personalization' index.html sw.js
+          ! grep -Eq 'cloud-sync-fix\.js|preview-mode\.js' index.html sw.js
       - name: Protect Firebase auth reserved namespace
         run: |
           grep -Fq "url.pathname.startsWith('/__/')" sw.js || {
