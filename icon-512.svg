@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Rider Hub">
+  <rect width="512" height="512" rx="112" fill="#08090a"/>
+  <path d="M256 70 382 118 360 330 256 430 152 330 130 118Z" fill="#151719" stroke="#f0a12b" stroke-width="18"/>
+  <path d="M174 172h76c58 0 88 25 88 70 0 31-16 53-45 64l55 70h-58l-46-61h-20v61h-50Zm50 42v60h25c27 0 40-10 40-30 0-20-13-30-40-30Z" fill="#f5f3ef"/>
+  <path d="M334 172h50v204h-50v-82h-54v-46h54Z" fill="#f0a12b" opacity=".96"/>
+</svg>
