@@ -73,25 +73,32 @@ jobs:
           const fs=require('fs');
           const auth=fs.readFileSync('auth-flow-controller.js','utf8');
           const approved=fs.readFileSync('approved-changes.js','utf8');
+          const publicLayer=fs.readFileSync('phase3-public.js','utf8');
           const index=fs.readFileSync('index.html','utf8');
           const catalog=fs.readFileSync('motorcycle-catalog.js','utf8');
+          const runtime=fs.readFileSync('approved-runtime-fixes.js','utf8');
           if((auth.match(/\{k:'/g)||[]).length!==3) throw new Error('Onboarding must have exactly three slides');
           if(!auth.includes('Continue with Google')) throw new Error('Google login action missing');
           if(/Everything around your Ronin|TVS RONIN · CHARCOAL EMBER/.test(auth)) throw new Error('Onboarding contains bike-specific branding');
-          if(/Firebase|Firestore|Google Sign-In is ready/.test(auth)) throw new Error('Login/onboarding exposes backend jargon');
+          const login=auth.slice(auth.indexOf('function renderLogin'),auth.indexOf('window.rhApprovedWelcomeBack'));
+          if(/Firebase|Firestore|Google Sign-In is ready/.test(login)) throw new Error('Visible login copy exposes backend jargon');
           if(!index.includes('RIDER HUB')||!index.includes('MOTORCYCLE OS')) throw new Error('Generic pre-login header missing');
           if(!index.includes('rh-bell-svg')) throw new Error('Bell icon missing from header');
-          if(!approved.includes('Private Workspace') && !approved.includes('private workspace')) {
-            // Removal is implemented by selector text; absence is okay only if the removal helper remains.
-            if(!approved.includes('removePrivateWorkspace')) throw new Error('Private Workspace removal missing');
-          }
+          if(!approved.includes('removePrivateWorkspace')) throw new Error('Private Workspace removal missing');
           if(!approved.includes('GEAR GARAGE')||!approved.includes('Your riding inventory')) throw new Error('Approved Gear Garage missing');
           if(!approved.includes('Install as App')) throw new Error('Prominent install action missing');
-          const more=approved.slice(approved.indexOf('window.renderMore=function'));
+          const moreStart=approved.indexOf('window.renderMore=function');
+          const moreEnd=approved.indexOf('window.openAppSettings',moreStart);
+          const more=approved.slice(moreStart,moreEnd);
           if(!more.includes('Emergency contacts')||!more.includes('My Account')||!more.includes('Files & storage')) throw new Error('Required More actions missing');
+          if(/Notifications|Weather & Maps|App settings/.test(more)) throw new Error('Removed More actions returned');
           if(!approved.includes('removeTopAddRide')) throw new Error('Duplicate Add Ride removal missing');
           if(!catalog.includes('GetMakesForVehicleType/moto')||!catalog.includes('vehicletype/motorcycle')) throw new Error('Global motorcycle catalog lookup missing');
           if(!catalog.includes("'tvs|ronin'")||!catalog.includes("'royal enfield|hunter 350'")) throw new Error('Verified motorcycle profiles missing');
+          if(!runtime.includes('UserManual2026/TVS-Ronin.pdf')||!runtime.includes('hunter-350-dual-channel.pdf')) throw new Error('Verified owner manual links missing');
+          if(!publicLayer.includes('bikeConfigured:false')||!publicLayer.includes('s.gear=[]')||!publicLayer.includes('USER_PREFIX')) throw new Error('Clean per-user workspace contract missing');
+          if(!approved.includes("location.hostname===CANONICAL_HOST&&!publicUser()")) throw new Error('Starter-state migration guard missing');
+          if(!auth.includes('riderHubRequireBikeSetup')) throw new Error('Mandatory new-user motorcycle gate missing');
           NODE
       - name: Reject obsolete runtime layers
         run: |
