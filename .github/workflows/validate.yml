@@ -47,6 +47,11 @@ jobs:
           test -s icon-192.svg
           test -s icon-512.svg
           test -s icon-maskable.svg
+      - name: Reject obsolete runtime layers
+        run: |
+          test ! -e cloud-sync-fix.js
+          test ! -e preview-mode.js
+          ! grep -Eq 'cloud-sync-fix\.js|preview-mode\.js' index.html sw.js
       - name: Protect Firebase auth reserved namespace
         run: |
           grep -Fq "url.pathname.startsWith('/__/')" sw.js || {
