@@ -17,14 +17,15 @@
 <link rel="stylesheet" href="phase3-live.css">
 <link rel="stylesheet" href="phase3-account.css">
 <link rel="stylesheet" href="firebase-account.css">
-<title>Rider Hub — Charcoal Ember</title>
+<link rel="stylesheet" href="approved-changes.css">
+<title>Rider Hub</title>
 </head>
 <body>
 <div class="topo"></div>
 <div class="shell">
 <header class="header">
-  <div class="brand"><div class="brandmark" title="My Account">RH</div><div><div class="brandname">TVS <em>RONIN</em></div><div class="sub">CHARCOAL EMBER</div></div></div>
-  <div class="header-actions"><button id="rhSyncChip" class="rh-sync-chip" data-state="loading" onclick="openMyAccount()" aria-live="polite" title="Rider Hub sync status" hidden>STARTING</button><button id="undoBtn" class="round" onclick="undo()" title="Undo">↶</button><button class="round" onclick="openNotifications()" title="Notifications">!</button></div>
+  <div class="brand"><div class="brandmark" title="My Account">RH</div><div><div class="brandname">RIDER HUB</div><div class="sub">MOTORCYCLE OS</div></div></div>
+  <div class="header-actions"><button id="rhSyncChip" class="rh-sync-chip" data-state="loading" onclick="openMyAccount()" aria-live="polite" title="Rider Hub sync status" hidden>STARTING</button><button id="undoBtn" class="round" onclick="undo()" title="Undo">↶</button><button class="round" onclick="openNotifications()" title="Notifications" aria-label="Notifications"><svg class="rh-bell-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg></button></div>
 </header>
 <main>
   <section id="home" class="page active"></section>
@@ -54,8 +55,11 @@
 <script src="phase3-live.js"></script>
 <script src="phase3-account.js"></script>
 <script src="phase3-public.js"></script>
+<script src="state-bridge.js"></script>
 <script src="stability-hotfix.js"></script>
 <script src="firebase-ui-bridge.js"></script>
+<script src="motorcycle-catalog.js"></script>
+<script src="approved-changes.js"></script>
 <script src="firebase-config.js"></script>
 <script type="module" src="firebase-auth.js"></script>
 </body>
