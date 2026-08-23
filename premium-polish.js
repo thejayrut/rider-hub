@@ -2,6 +2,7 @@
 'use strict';
 
 const ONBOARD_KEY='riderhub_onboarding_seen_v1';
+const APP_KEY='riderhub_stable_v1';
 const DB_NAME='riderhub_private_docs';
 const CREATOR='Jayrut Gajjar';
 const INSTAGRAM_HANDLE='@jayrut.raw';
@@ -12,19 +13,31 @@ const FEEDBACK_EMAIL='jayrut.raw@gmail.com';
 const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
 const S=()=>window.state||{};
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 const today=()=>new Date().toISOString().slice(0,10);
 const addDays=(date,n)=>{const d=new Date((date||today())+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
 const fmtDate=s=>{if(!s)return'Date TBD';try{return new Date(s+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}catch{return s}};
 const money=n=>'₹'+Math.round(Number(n)||0).toLocaleString('en-IN');
 const rideById=id=>(S().rides||[]).find(r=>r.id===id);
 const rideProgress=r=>{let total=0,done=0;for(const d of r?.days||[])for(const t of d.tasks||[]){total++;if(['done','skipped'].includes(t.status))done++}return total?Math.round(done/total*100):0};
+const totalTasks=r=>(r?.days||[]).reduce((a,d)=>a+(d.tasks||[]).length,0);
+const completedTasks=r=>(r?.days||[]).reduce((a,d)=>a+(d.tasks||[]).filter(t=>['done','skipped'].includes(t.status)).length,0);
+const persist=()=>{try{localStorage.setItem(APP_KEY,JSON.stringify(S()))}catch{}};
 const save=()=>window.save?.();
 const toast=t=>window.toast?.(t);
-const modal=h=>window.openModal?.(h);
+const modal=(h,o)=>window.openModal?.(h,o);
 const close=()=>window.closeModal?.();
 
-/* ---------- Refresh-safe authentication ---------- */
+const baseSetPage=window.setPage;
+const baseOpenModal=window.openModal;
+const baseCloseModal=window.closeModal;
+const baseOpenRideMode=window.openRideMode;
+const baseRideModeDay=window.rideModeDay;
+const baseRideModeTask=window.rideModeTask;
+const baseCloseRideMode=window.closeRideMode;
+let restoringHistory=false;
+
+/* ---------- Fast refresh-safe authentication ---------- */
 document.documentElement.classList.add('auth-pending');
 const originalSignedOut=window.riderHubSignedOut;
 window.riderHubAuthBooting=()=>document.documentElement.classList.add('auth-pending');
@@ -32,7 +45,7 @@ function renderReturningLogin(){
   const shell=$('#authShell'),stage=$('#authStage');
   if(!shell||!stage)return;
   shell.classList.add('active');
-  stage.innerHTML=`<div class="return-login"><div class="kicker">WELCOME BACK</div><h1>Continue to Rider Hub.</h1><p>Your motorcycle, rides, gear and saved state will load after sign-in.</p><div class="auth-actions"><button class="primary" onclick="riderHubLogin()">Continue with Google</button></div><button class="text-action" onclick="showOnboardingAgain()">View Rider Hub introduction</button></div>`;
+  stage.innerHTML=`<div class="return-login"><div class="kicker">WELCOME BACK</div><h1>Continue to Rider Hub.</h1><p>Your motorcycle, rides, gear and saved state are ready on this device. Sign in to restore cloud sync.</p><div class="auth-actions"><button class="primary" onclick="riderHubLogin()">Continue with Google</button></div><button class="text-action" onclick="showOnboardingAgain()">View Rider Hub introduction</button></div>`;
 }
 window.showOnboardingAgain=()=>{localStorage.removeItem(ONBOARD_KEY);originalSignedOut?.()};
 window.riderHubSignedOut=()=>localStorage.getItem(ONBOARD_KEY)==='1'?renderReturningLogin():originalSignedOut?.();
@@ -41,271 +54,154 @@ window.riderHubAuthReady=user=>{
   document.documentElement.classList.remove('auth-pending');
   if(!user&&localStorage.getItem(ONBOARD_KEY)==='1')renderReturningLogin();
   updateConnectivity();
-  setTimeout(enhanceActivePage,0);
+  renderActivePremium();
 };
+
+/* ---------- Browser / Android back-stack ---------- */
+function currentNavState(extra={}){
+  return {rh:true,page:S().ui?.page||'home',rideId:S().ui?.rideId||'',rideMode:!!$('#rideMode')?.classList.contains('open'),modal:!!$('#modalWrap')?.classList.contains('open'),...extra};
+}
+function replaceNav(extra={}){if(!restoringHistory)history.replaceState(currentNavState(extra),'')}
+function pushNav(extra={}){if(!restoringHistory)history.pushState(currentNavState(extra),'')}
+window.openModal=(html,opt)=>{
+  if(!restoringHistory&&!history.state?.modal)pushNav({modal:true});
+  return baseOpenModal?.(html,opt);
+};
+window.closeModal=()=>{
+  if(!restoringHistory&&history.state?.rh&&history.state.modal)return history.back();
+  return baseCloseModal?.();
+};
+function restoreHistoryState(st){
+  if(!st?.rh)return;
+  restoringHistory=true;
+  try{
+    if($('#modalWrap')?.classList.contains('open')){
+      baseCloseModal?.();
+      if($('#modalWrap')?.classList.contains('open')){history.pushState(currentNavState({modal:true}),'');return}
+    }
+    $('#rideMode')?.classList.remove('open');
+    const page=st.page||'home';
+    S().ui.page=page;S().ui.rideId=st.rideId||'';persist();
+    baseSetPage?.(page);
+    renderPagePremium(page);
+    if(st.rideMode&&st.rideId){const r=rideById(st.rideId);if(r){baseOpenRideMode?.(st.rideId);renderRideModePremium(r)}}
+  }finally{restoringHistory=false}
+}
+window.addEventListener('popstate',e=>restoreHistoryState(e.state));
+if(!history.state?.rh)history.replaceState(currentNavState({modal:false,rideMode:false}),'');
 
 /* ---------- Online / offline status + bell ---------- */
 function updateConnectivity(){
-  const btn=$('#networkStatus'),online=navigator.onLine;
-  if(!btn)return;
-  btn.classList.toggle('online',online);
-  btn.classList.toggle('offline',!online);
-  btn.setAttribute('aria-label',online?'Online':'Offline');
-  btn.title=online?'Online':'Offline';
+  const btn=$('#networkStatus'),online=navigator.onLine;if(!btn)return;
+  btn.classList.toggle('online',online);btn.classList.toggle('offline',!online);
+  btn.setAttribute('aria-label',online?'Online':'Offline');btn.title=online?'Online':'Offline';
 }
 window.openConnectivityInfo=()=>{
   const online=navigator.onLine;
-  modal(`<div class="modalhead"><div><div class="kicker">CONNECTION</div><h3>${online?'Online':'Offline'}</h3><p class="caption">${online?'Internet connection is available.':'Rider Hub will keep core ride data available on this device.'}</p></div><button class="iconbtn" onclick="closeModal()">×</button></div>
-  <div class="connection-grid">
-    <div class="connection-card"><strong>Works offline</strong><ul><li>Home</li><li>Bike information</li><li>Saved rides</li><li>Ride Mode and day schedules</li><li>Gear Garage</li><li>Expenses, notes and packing</li><li>Cached manuals and documents</li></ul></div>
-    <div class="connection-card"><strong>Needs internet</strong><ul><li>Google sign-in</li><li>Cross-device sync</li><li>Google Drive backup and download</li><li>Google Maps navigation</li><li>Motorcycle make/model lookup when it is not already available locally</li><li>Account sign-in and deletion</li></ul></div>
-  </div><div class="connection-note">Offline edits stay on this device and sync again when internet and the required Google service are available.</div>`);
+  modal(`<div class="modalhead"><div><div class="kicker">CONNECTION</div><h3>${online?'Online':'Offline'}</h3><p class="caption">${online?'Internet connection is available.':'Core Rider Hub features stay available from this device.'}</p></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="connection-grid"><div class="connection-card"><strong>Works offline</strong><ul><li>Home</li><li>Bike information</li><li>Saved rides</li><li>Ride Mode and day schedules</li><li>Gear Garage</li><li>Expenses, notes and packing</li><li>Cached manuals and documents</li></ul></div><div class="connection-card"><strong>Needs internet</strong><ul><li>Google sign-in</li><li>Cross-device sync</li><li>Google Drive backup and download</li><li>Google Maps navigation</li><li>Motorcycle make/model lookup when not already stored</li><li>Account sign-in and deletion</li></ul></div></div><div class="connection-note">Offline edits stay on this device and sync again when internet and the required Google service are available.</div>`);
 };
 window.openNotifications=()=>modal(`<div class="modalhead"><div><div class="kicker">NOTIFICATIONS</div><h3>Rider alerts</h3></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="empty-premium"><span class="bell-large">${bellSvg()}</span><strong>No new alerts</strong><p>Service, ride and document reminders will appear here when they need your attention.</p></div>`);
 function bellSvg(){return'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'}
 window.addEventListener('online',()=>{updateConnectivity();if(window.cloudSyncConnected?.())syncAllLocalFilesToDrive().catch(()=>{})});
 window.addEventListener('offline',updateConnectivity);
-updateConnectivity();
 
 /* ---------- Drive-first private files ---------- */
-function idbEntries(){
-  return new Promise(resolve=>{
-    const req=indexedDB.open(DB_NAME,1);
-    req.onerror=()=>resolve([]);
-    req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('docs'))req.result.createObjectStore('docs')};
-    req.onsuccess=()=>{
-      const db=req.result,tx=db.transaction('docs'),store=tx.objectStore('docs'),ks=store.getAllKeys(),vs=store.getAll();
-      let keys=[],vals=[];
-      ks.onsuccess=()=>keys=ks.result||[];
-      vs.onsuccess=()=>vals=vs.result||[];
-      tx.oncomplete=()=>{db.close();resolve(keys.map((key,i)=>({key:String(key),file:vals[i]})).filter(x=>x.file))};
-      tx.onerror=()=>{db.close();resolve([])};
-    };
-  });
-}
-function migrateLegacyLocal(key,file){
-  const scoped=window.riderHubScopedDocKey?.(key);
-  if(!scoped||scoped===key||String(key).startsWith('rhuser_'))return Promise.resolve();
-  return new Promise(resolve=>{
-    const req=indexedDB.open(DB_NAME,1);
-    req.onerror=()=>resolve();
-    req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('docs'))req.result.createObjectStore('docs')};
-    req.onsuccess=()=>{
-      const db=req.result,tx=db.transaction('docs','readwrite'),store=tx.objectStore('docs');
-      store.put(file,scoped);store.delete(key);
-      tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>{db.close();resolve()};
-    };
-  });
-}
-async function syncAllLocalFilesToDrive(){
-  if(!window.cloudSyncConnected?.())return false;
-  const entries=await idbEntries();
-  let synced=0;
-  for(const entry of entries){
-    try{
-      await window.riderHubUploadDoc?.(entry.key,entry.file);
-      await migrateLegacyLocal(entry.key,entry.file);
-      synced++;
-    }catch(e){console.warn('Rider Hub Drive file pending',entry.key,e)}
-  }
-  localStorage.setItem('riderhub_last_drive_file_sync',new Date().toISOString());
-  return synced===entries.length;
-}
+function idbEntries(){return new Promise(resolve=>{const req=indexedDB.open(DB_NAME,1);req.onerror=()=>resolve([]);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('docs'))req.result.createObjectStore('docs')};req.onsuccess=()=>{const db=req.result,tx=db.transaction('docs'),store=tx.objectStore('docs'),ks=store.getAllKeys(),vs=store.getAll();let keys=[],vals=[];ks.onsuccess=()=>keys=ks.result||[];vs.onsuccess=()=>vals=vs.result||[];tx.oncomplete=()=>{db.close();resolve(keys.map((key,i)=>({key:String(key),file:vals[i]})).filter(x=>x.file))};tx.onerror=()=>{db.close();resolve([])}}})}
+function migrateLegacyLocal(key,file){const scoped=window.riderHubScopedDocKey?.(key);if(!scoped||scoped===key||String(key).startsWith('rhuser_'))return Promise.resolve();return new Promise(resolve=>{const req=indexedDB.open(DB_NAME,1);req.onerror=()=>resolve();req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('docs'))req.result.createObjectStore('docs')};req.onsuccess=()=>{const db=req.result,tx=db.transaction('docs','readwrite'),store=tx.objectStore('docs');store.put(file,scoped);store.delete(key);tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>{db.close();resolve()}}})}
+async function syncAllLocalFilesToDrive(){if(!window.cloudSyncConnected?.())return false;const entries=await idbEntries();let synced=0;for(const entry of entries){try{await window.riderHubUploadDoc?.(entry.key,entry.file);await migrateLegacyLocal(entry.key,entry.file);synced++}catch(e){console.warn('Rider Hub Drive file pending',entry.key,e)}}localStorage.setItem('riderhub_last_drive_file_sync',new Date().toISOString());return synced===entries.length}
 window.riderHubSyncAllLocalFiles=syncAllLocalFilesToDrive;
 const driveConnect=window.requestDriveAccess;
-if(typeof driveConnect==='function')window.requestDriveAccess=async function(syncAfter=false){
-  const ok=await driveConnect(syncAfter);
-  if(ok){
-    const all=await syncAllLocalFilesToDrive();
-    toast(all?'Drive connected · private files synced':'Drive connected · some files are pending');
-    setTimeout(()=>window.openCloudSetup?.(),0);
-  }
-  return ok;
-};
-window.cloudSyncLabel=()=>{
-  const c=window.riderHubCloudConfig?.()||{};
-  if(window.cloudSyncConnected?.())return `Google Drive connected${c.email?' · '+c.email:''}`;
-  if(c.email)return `Google Drive reconnect needed · ${c.email}`;
-  return 'Google Drive not connected';
-};
-window.openCloudSetup=()=>{
-  const c=window.riderHubCloudConfig?.()||{},ready=!!window.cloudSyncConnected?.(),last=localStorage.getItem('riderhub_last_drive_file_sync');
-  modal(`<div class="modalhead"><div><div class="kicker">PRIVATE FILE BACKUP</div><h3>Google Drive</h3><p class="caption">Your Rider Hub documents can follow you across phone and desktop.</p></div><button class="iconbtn" onclick="closeModal()">×</button></div>
-    <div class="drive-state ${ready?'connected':'disconnected'}"><div class="drive-state-icon">${ready?'✓':'☁'}</div><div><strong>${ready?'Drive connected':'Drive not connected'}</strong><p>${ready?`Connected as ${esc(c.email||'your Google account')}.`:'Connect Drive on this device to back up or download private files.'}</p></div></div>
-    <div class="drive-paths"><div><span>DOCUMENTS</span><strong>My Drive / Rider Hub / Documents</strong></div><div><span>OWNER MANUALS</span><strong>My Drive / Rider Hub / Owner Manuals</strong></div></div>
-    <div class="connection-note">When Drive is connected, every document you attach is backed up there. Rider Hub also keeps a device copy when available so cached files can still open offline.${last?` Last file sync: ${esc(new Date(last).toLocaleString())}.`:''}</div>
-    ${ready?'<button class="primary full" disabled>✓ Google Drive connected</button><button class="ghost full" style="margin-top:8px" onclick="riderHubSyncAllLocalFiles().then(()=>toast(\'Drive files synced\'))">Sync private files now</button>':'<button class="primary full" onclick="requestDriveAccess(true)">Connect Google Drive</button>'}`);
-};
+if(typeof driveConnect==='function')window.requestDriveAccess=async function(syncAfter=false){const ok=await driveConnect(syncAfter);if(ok){const all=await syncAllLocalFilesToDrive();toast(all?'Drive connected · private files synced':'Drive connected · some files are pending');setTimeout(()=>window.openCloudSetup?.(),0)}return ok};
+window.cloudSyncLabel=()=>{const c=window.riderHubCloudConfig?.()||{};if(window.cloudSyncConnected?.())return`Google Drive connected${c.email?' · '+c.email:''}`;if(c.email)return`Google Drive reconnect needed · ${c.email}`;return'Google Drive not connected'};
+window.openCloudSetup=()=>{const c=window.riderHubCloudConfig?.()||{},ready=!!window.cloudSyncConnected?.(),last=localStorage.getItem('riderhub_last_drive_file_sync');modal(`<div class="modalhead"><div><div class="kicker">PRIVATE FILE BACKUP</div><h3>Google Drive</h3><p class="caption">Your Rider Hub documents can follow you across phone and desktop.</p></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="drive-state ${ready?'connected':'disconnected'}"><div class="drive-state-icon">${ready?'✓':'☁'}</div><div><strong>${ready?'Drive connected':'Drive not connected'}</strong><p>${ready?`Connected as ${esc(c.email||'your Google account')}.`:'Connect Drive on this device to back up or download private files.'}</p></div></div><div class="drive-paths"><div><span>DOCUMENTS</span><strong>My Drive / Rider Hub / Documents</strong></div><div><span>OWNER MANUALS</span><strong>My Drive / Rider Hub / Owner Manuals</strong></div></div><div class="connection-note">When Drive is connected, every document you attach is backed up there. Rider Hub also keeps a device copy when available so cached files can still open offline.${last?` Last file sync: ${esc(new Date(last).toLocaleString())}.`:''}</div>${ready?'<button class="primary full" disabled>✓ Google Drive connected</button><button class="ghost full" style="margin-top:8px" onclick="riderHubSyncAllLocalFiles().then(()=>toast(\'Drive files synced\'))">Sync private files now</button>':'<button class="primary full" onclick="requestDriveAccess(true)">Connect Google Drive</button>'}`)};
 
 /* ---------- Document vault ---------- */
-const primaryDocs=[
-  {id:'licence',name:'Rider licence',desc:'Driving or learner licence'},
-  {id:'insurance',name:'Insurance',desc:'Motorcycle insurance policy'},
-  {id:'registration_rc',name:'Registration / RC',desc:'Registration certificate'},
-  {id:'puc',name:'PUC / emissions',desc:'Pollution under control certificate'}
-];
-const moreDocs=[
-  {id:'vehicle_invoice',name:'Purchase invoice',desc:'Vehicle purchase invoice or receipt'},
-  {id:'warranty',name:'Warranty',desc:'Manufacturer or extended warranty'},
-  {id:'service_invoice',name:'Service invoices',desc:'Workshop and service bills'}
-];
-function docRow(d,custom=false){
-  const drive=window.cloudSyncConnected?.();
-  return `<button class="doc-row" onclick="openDoc('${esc(d.id)}','${custom?'1':'0'}')"><span class="doc-icon">▤</span><span class="doc-copy"><strong>${esc(d.name)}</strong><small>${esc(d.desc||'Private document')}</small></span><span class="doc-state ${drive?'drive':'local'}">${drive?'DRIVE':'LOCAL'}</span><span class="chev">›</span></button>`;
-}
-function docsMarkup(){
-  return `<div class="rh-premium-docs"><div class="doc-stack">${primaryDocs.map(d=>docRow(d)).join('')}<button class="doc-row more" onclick="openMoreDocuments()"><span class="doc-icon">•••</span><span class="doc-copy"><strong>More documents</strong><small>Invoice, warranty, service records and custom documents</small></span><span class="chev">›</span></button></div><div class="doc-footnote">${window.cloudSyncConnected?.()?'Google Drive connected · attached files back up to your Rider Hub folder.':'Files stay on this device until Google Drive is connected.'}</div></div>`;
-}
-function enhanceBikeDocuments(){
-  const root=$('#bike');if(!root||root.querySelector('.rh-premium-docs'))return;
-  const heads=[...root.querySelectorAll('.section-head')];
-  const head=heads.find(h=>/Document vault/i.test(h.textContent||''));
-  if(!head)return;
-  const old=head.nextElementSibling;
-  if(old)old.outerHTML=docsMarkup();else head.insertAdjacentHTML('afterend',docsMarkup());
-}
-window.openMoreDocuments=()=>{
-  const custom=S().documents?.custom||[];
-  modal(`<div class="modalhead"><div><div class="kicker">DOCUMENT VAULT</div><h3>More documents</h3><p class="caption">Keep less-common records here, then add anything else with your own name.</p></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="doc-stack in-modal">${moreDocs.map(d=>docRow(d)).join('')}${custom.map(d=>docRow(d,true)).join('')}</div><button class="primary full" style="margin-top:12px" onclick="addCustomDocument()">+ Add custom document</button>`);
-};
-function resolveDocument(id,customFlag='0'){
-  if(customFlag==='1'||String(id).startsWith('custom_'))return (S().documents?.custom||[]).find(x=>x.id===id);
-  return [...primaryDocs,...moreDocs].find(x=>x.id===id);
-}
-window.openDoc=(id,customFlag='0')=>{
-  const d=resolveDocument(id,customFlag);if(!d)return;
-  const drive=!!window.cloudSyncConnected?.(),cfg=window.riderHubCloudConfig?.()||{};
-  modal(`<div class="modalhead"><div><div class="kicker">PRIVATE DOCUMENT</div><h3>${esc(d.name)}</h3><p class="caption">${esc(d.desc||'')}</p></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="document-storage-state ${drive?'connected':'pending'}"><strong>${drive?'Google Drive connected':'Drive backup pending'}</strong><p>${drive?'Attach or replace this file and Rider Hub backs it up to My Drive / Rider Hub / Documents. A device copy is kept when available for offline use.':cfg.email?'Reconnect Google Drive on this device to back up and open the cloud copy.':'The file can be saved on this device now. Connect Google Drive to make it available across devices.'}</p></div><div class="modal-actions"><button class="ghost" onclick="openPrivateDocument('${esc(id)}')">Open</button><button class="primary" onclick="pickPrivateDocument('${esc(id)}')">Attach / replace</button></div>`);
-};
-window.pickPrivateDocument=id=>{
-  let input=$('#privateDocInputPremium');
-  if(!input){input=document.createElement('input');input.type='file';input.id='privateDocInputPremium';input.hidden=true;document.body.appendChild(input)}
-  input.onchange=async()=>{
-    const f=input.files?.[0];if(!f)return;
-    await window.savePrivateDoc?.(id,f);
-    if(window.cloudSyncConnected?.()){
-      try{await window.riderHubUploadDoc?.(id,f);toast('Backed up to Google Drive')}catch{toast('Saved on device · Drive backup pending')}
-    }else toast('Saved on this device · Drive backup pending');
-    enhanceBikeDocuments();
-  };
-  input.value='';input.click();
-};
-window.openPrivateDocument=async id=>{
-  const f=await window.getPrivateDoc?.(id);
-  if(f)return window.open(URL.createObjectURL(f),'_blank','noopener');
-  const cfg=window.riderHubCloudConfig?.()||{};
-  if(cfg.email&&!window.cloudSyncConnected?.())return toast('Connect Google Drive on this device to open the cloud file');
-  toast('No file attached yet');
-};
-window.openStoredManual=async()=>{
-  const f=await window.getPrivateDoc?.('owner_manual');
-  if(f)return window.open(URL.createObjectURL(f),'_blank','noopener');
-  const cfg=window.riderHubCloudConfig?.()||{};
-  toast(cfg.email&&!window.cloudSyncConnected?.()?'Connect Google Drive on this device to open the manual':'No owner manual attached yet');
-};
+const primaryDocs=[{id:'licence',name:'Rider licence',desc:'Driving or learner licence'},{id:'insurance',name:'Insurance',desc:'Motorcycle insurance policy'},{id:'registration_rc',name:'Registration / RC',desc:'Registration certificate'},{id:'puc',name:'PUC / emissions',desc:'Pollution under control certificate'}];
+const moreDocs=[{id:'vehicle_invoice',name:'Purchase invoice',desc:'Vehicle purchase invoice or receipt'},{id:'warranty',name:'Warranty',desc:'Manufacturer or extended warranty'},{id:'service_invoice',name:'Service invoices',desc:'Workshop and service bills'}];
+function docRow(d,custom=false){const drive=window.cloudSyncConnected?.();return`<button class="doc-row" onclick="openDoc('${esc(d.id)}','${custom?'1':'0'}')"><span class="doc-icon">▤</span><span class="doc-copy"><strong>${esc(d.name)}</strong><small>${esc(d.desc||'Private document')}</small></span><span class="doc-state ${drive?'drive':'local'}">${drive?'DRIVE':'LOCAL'}</span><span class="chev">›</span></button>`}
+function docsMarkup(){return`<div class="rh-premium-docs"><div class="doc-stack">${primaryDocs.map(d=>docRow(d)).join('')}<button class="doc-row more" onclick="openMoreDocuments()"><span class="doc-icon">•••</span><span class="doc-copy"><strong>More documents</strong><small>Invoice, warranty, service records and custom documents</small></span><span class="chev">›</span></button></div><div class="doc-footnote">${window.cloudSyncConnected?.()?'Google Drive connected · attached files back up to your Rider Hub folder.':'Files stay on this device until Google Drive is connected.'}</div></div>`}
+function enhanceBikeDocuments(){const root=$('#bike');if(!root||root.querySelector('.rh-premium-docs'))return;const head=[...root.querySelectorAll('.section-head')].find(h=>/Document vault/i.test(h.textContent||''));if(!head)return;const old=head.nextElementSibling;if(old)old.outerHTML=docsMarkup();else head.insertAdjacentHTML('afterend',docsMarkup())}
+window.openMoreDocuments=()=>{const custom=S().documents?.custom||[];modal(`<div class="modalhead"><div><div class="kicker">DOCUMENT VAULT</div><h3>More documents</h3><p class="caption">Invoice, warranty, service records and anything else you want to name yourself.</p></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="doc-stack in-modal">${moreDocs.map(d=>docRow(d)).join('')}${custom.map(d=>docRow(d,true)).join('')}</div><button class="primary full" style="margin-top:12px" onclick="addCustomDocument()">+ Add custom document</button>`)};
+function resolveDocument(id,customFlag='0'){if(customFlag==='1'||String(id).startsWith('custom_'))return(S().documents?.custom||[]).find(x=>x.id===id);return[...primaryDocs,...moreDocs].find(x=>x.id===id)}
+window.openDoc=(id,customFlag='0')=>{const d=resolveDocument(id,customFlag);if(!d)return;const drive=!!window.cloudSyncConnected?.(),cfg=window.riderHubCloudConfig?.()||{};modal(`<div class="modalhead"><div><div class="kicker">PRIVATE DOCUMENT</div><h3>${esc(d.name)}</h3><p class="caption">${esc(d.desc||'')}</p></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="document-storage-state ${drive?'connected':'pending'}"><strong>${drive?'Google Drive connected':'Drive backup pending'}</strong><p>${drive?'Attach or replace this file and Rider Hub backs it up to My Drive / Rider Hub / Documents. A device copy is kept when available for offline use.':cfg.email?'Reconnect Google Drive on this device to back up and open the cloud copy.':'The file can be saved on this device now. Connect Google Drive to make it available across devices.'}</p></div><div class="modal-actions"><button class="ghost" onclick="openPrivateDocument('${esc(id)}')">Open</button><button class="primary" onclick="pickPrivateDocument('${esc(id)}')">Attach / replace</button></div>`)};
+window.pickPrivateDocument=id=>{let input=$('#privateDocInputPremium');if(!input){input=document.createElement('input');input.type='file';input.id='privateDocInputPremium';input.hidden=true;document.body.appendChild(input)}input.onchange=async()=>{const f=input.files?.[0];if(!f)return;await window.savePrivateDoc?.(id,f);if(window.cloudSyncConnected?.()){try{await window.riderHubUploadDoc?.(id,f);toast('Backed up to Google Drive')}catch{toast('Saved on device · Drive backup pending')}}else toast('Saved on this device · Drive backup pending');enhanceBikeDocuments()};input.value='';input.click()};
+window.openPrivateDocument=async id=>{const f=await window.getPrivateDoc?.(id);if(f)return window.open(URL.createObjectURL(f),'_blank','noopener');const cfg=window.riderHubCloudConfig?.()||{};if(cfg.email&&!window.cloudSyncConnected?.())return toast('Connect Google Drive on this device to open the cloud file');toast('No file attached yet')};
+window.openStoredManual=async()=>{const f=await window.getPrivateDoc?.('owner_manual');if(f)return window.open(URL.createObjectURL(f),'_blank','noopener');const cfg=window.riderHubCloudConfig?.()||{};toast(cfg.email&&!window.cloudSyncConnected?.()?'Connect Google Drive on this device to open the manual':'No owner manual attached yet')};
 
 /* ---------- Premium About ---------- */
 window.openInstagram=()=>window.open(INSTAGRAM_URL,'_blank','noopener,noreferrer');
 window.openYouTube=()=>window.open(YOUTUBE_URL,'_blank','noopener,noreferrer');
 window.openFeedback=()=>{location.href=`mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent('Rider Hub Feedback')}&body=${encodeURIComponent('Hi Jayrut,\n\nMy Rider Hub feedback:\n')}`};
-window.openAbout=()=>modal(`<div class="about-premium"><div class="about-top"><div class="about-mark">RH</div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="kicker">RIDER HUB</div><h2>Your motorcycle companion.</h2><p class="about-lede">Built to keep the bike, the ride and the rider's important details close without feeling like another generic dashboard.</p><div class="creator-card"><span>CREATED BY</span><strong>${CREATOR}</strong><small>Rider Hub private beta</small></div><div class="social-premium"><button onclick="openInstagram()"><span class="social-icon">◎</span><div><small>INSTAGRAM</small><strong>${INSTAGRAM_HANDLE}</strong></div><span>↗</span></button><button onclick="openYouTube()"><span class="social-icon">▶</span><div><small>YOUTUBE</small><strong>${YOUTUBE_HANDLE}</strong></div><span>↗</span></button><button onclick="openFeedback()"><span class="social-icon">✉</span><div><small>FEEDBACK</small><strong>Send feedback</strong></div><span>↗</span></button></div><div class="about-story"><div><strong>Why it exists</strong><p>Motorcycle information, maintenance, rides, maps, gear and private files in one focused place.</p></div><div><strong>Your private files</strong><p>When Google Drive is connected, Rider Hub backs supported private files up to your own visible Rider Hub folder.</p></div></div><div class="about-footer"><span>${FEEDBACK_EMAIL}</span><span>Stable build</span></div></div>`);
+window.openAbout=()=>modal(`<div class="about-premium"><div class="about-top"><div class="about-mark">RH</div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="kicker">RIDER HUB</div><h2>Made for the road, not the dashboard.</h2><p class="about-lede">A focused motorcycle companion for the bike, the ride and the details worth keeping close.</p><div class="creator-card"><span>CREATED BY</span><strong>${CREATOR}</strong><small>Rider Hub private beta</small></div><div class="social-premium"><button onclick="openInstagram()"><span class="social-icon">◎</span><div><small>INSTAGRAM</small><strong>${INSTAGRAM_HANDLE}</strong></div><span>↗</span></button><button onclick="openYouTube()"><span class="social-icon">▶</span><div><small>YOUTUBE</small><strong>${YOUTUBE_HANDLE}</strong></div><span>↗</span></button><button onclick="openFeedback()"><span class="social-icon">✉</span><div><small>FEEDBACK</small><strong>Send feedback</strong></div><span>↗</span></button></div><div class="about-story"><div><strong>One place for the ride</strong><p>Motorcycle information, maintenance, rides, maps, gear and private files without unnecessary complexity.</p></div><div><strong>Your files stay yours</strong><p>When Google Drive is connected, supported private files are backed up to your own visible Rider Hub folder.</p></div></div><div class="about-footer"><span>${FEEDBACK_EMAIL}</span><span>Stable private beta</span></div></div>`);
 
-/* ---------- Ride editing helpers ---------- */
-window.editRide=id=>{
-  const r=rideById(id);if(!r)return;
-  modal(`<div class="modalhead"><div><div class="kicker">EDIT RIDE</div><h3>${esc(r.name)}</h3></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="field"><label>RIDE NAME</label><input id="editRideName" value="${esc(r.name)}"></div><div class="grid2"><div class="field"><label>START DATE</label><input id="editRideStart" type="date" value="${esc(r.start||today())}"></div><div class="field"><label>NUMBER OF DAYS</label><input id="editRideDays" inputmode="numeric" value="${r.days.length}"></div></div><div class="field"><label>STATUS</label><select id="editRideStatus"><option value="planned" ${r.status!=='completed'?'selected':''}>Planned</option><option value="completed" ${r.status==='completed'?'selected':''}>Completed</option></select></div><div class="modal-actions"><button class="ghost" onclick="closeModal()">Cancel</button><button class="primary" onclick="saveRideEdit('${id}')">Save ride</button></div>`);
-};
-window.saveRideEdit=id=>{
-  const r=rideById(id);if(!r)return;
-  const name=$('#editRideName')?.value.trim(),start=$('#editRideStart')?.value||r.start||today(),count=Math.max(1,Math.min(60,Math.round(Number($('#editRideDays')?.value||r.days.length))));
-  if(!name)return toast('Add a ride name');
-  if(count<r.days.length){const removed=r.days.slice(count);if(removed.some(d=>(d.tasks||[]).length||(d.segments||[]).length))return toast('Clear tasks and route parts from removed days before shortening this ride')}
-  while(r.days.length<count){const i=r.days.length;r.days.push({day:i+1,date:addDays(start,i),title:`Day ${i+1}`,from:'',to:'',segments:[],tasks:[]})}
-  r.days=r.days.slice(0,count).map((d,i)=>({...d,day:i+1,date:addDays(start,i)}));
-  r.name=name;r.start=start;r.end=addDays(start,count-1);r.status=$('#editRideStatus')?.value||'planned';r.selectedDay=Math.min(r.selectedDay||0,count-1);
-  save();close();renderRidesPremium();toast('Ride updated');
-};
+/* ---------- Gear: preserve keyboard focus ---------- */
+function gearFilteredItems(){const q=(S().ui?.gearQuery||'').toLowerCase(),status=S().ui?.gearStatus||'all',owner=S().ui?.gearOwner||'all';return(S().gear||[]).filter(x=>(status==='all'||x.status===status)&&(owner==='all'||x.owner===owner)&&(!q||`${x.name} ${x.category} ${x.owner} ${x.note||''}`.toLowerCase().includes(q)))}
+function gearItemsHtml(){const items=gearFilteredItems();return items.map(x=>`<button class="gear-row-premium" onclick="editGear('${x.id}')"><span class="gear-icon">◇</span><span><strong>${esc(x.name)}</strong><small>${esc(x.owner||'Me')} · ${esc(x.category||'Gear')}</small></span><span class="gear-price"><b>${x.amount==null?'PRICE TBD':money(x.amount)}</b><small class="${x.status==='owned'?'owned':'planned'}">${x.status==='owned'?'BOUGHT':'WILL BUY'}</small></span></button>`).join('')||'<div class="gear-empty"><strong>No gear matches</strong><small>Try another search or filter.</small></div>'}
+function renderGearResults(){const out=$('#gearResultsPremium'),count=$('#gearMatchCount');if(out)out.innerHTML=gearItemsHtml();if(count)count.textContent=`${gearFilteredItems().length} item${gearFilteredItems().length===1?'':'s'}`}
+window.gearSearchChanged=input=>{S().ui.gearQuery=input.value;persist();renderGearResults()};
+window.setGearFilterPremium=(type,value)=>{S().ui[type==='status'?'gearStatus':'gearOwner']=value;persist();renderGearPremium()};
+function renderGearPremium(){const root=$('#gear');if(!root)return;const owned=(S().gear||[]).filter(x=>x.status==='owned'),planned=(S().gear||[]).filter(x=>x.status==='planned'),owners=[...new Set((S().gear||[]).map(x=>x.owner).filter(Boolean))],status=S().ui?.gearStatus||'all',owner=S().ui?.gearOwner||'all';root.innerHTML=`<div class="gear-premium"><section class="gear-hero-premium"><div><div class="kicker">GEAR GARAGE</div><h1>Your riding inventory.</h1><p>What you own, what you want next, and what it costs — without losing focus while you search.</p></div><button class="primary" onclick="editGear()">+ Add gear</button></section><div class="gear-stats"><div><span>OWNED</span><strong>${owned.length}</strong></div><div><span>WILL BUY</span><strong>${planned.length}</strong></div><div><span>KNOWN SPEND</span><strong>${money(owned.reduce((a,x)=>a+Number(x.amount||0),0))}</strong></div><div><span>PLANNED</span><strong>${money(planned.reduce((a,x)=>a+Number(x.amount||0),0))}</strong></div></div><section class="gear-controls"><div class="gear-search-wrap"><span>⌕</span><input id="gearSearchPremium" autocomplete="off" inputmode="search" placeholder="Search helmet, luggage, electronics…" value="${esc(S().ui?.gearQuery||'')}" oninput="gearSearchChanged(this)"></div><div class="gear-filter-row"><div class="chips">${[['all','All'],['owned','Bought'],['planned','Will buy']].map(([v,l])=>`<button class="chip ${status===v?'active':''}" onclick="setGearFilterPremium('status','${v}')">${l}</button>`).join('')}</div><div class="chips"><button class="chip ${owner==='all'?'active':''}" onclick="setGearFilterPremium('owner','all')">Everything</button>${owners.map(o=>`<button class="chip ${owner===o?'active':''}" onclick="setGearFilterPremium('owner','${esc(o)}')">${esc(o)}</button>`).join('')}</div></div><div class="gear-result-head"><span>INVENTORY</span><small id="gearMatchCount">${gearFilteredItems().length} item${gearFilteredItems().length===1?'':'s'}</small></div><div id="gearResultsPremium" class="gear-list-premium">${gearItemsHtml()}</div></section></div>`}
+window.renderGear=renderGearPremium;
+const baseSaveGearItem=window.saveGearItem,baseDeleteGear=window.deleteGear;
+if(typeof baseSaveGearItem==='function')window.saveGearItem=function(){const out=baseSaveGearItem.apply(this,arguments);setTimeout(renderGearPremium,0);return out};
+if(typeof baseDeleteGear==='function')window.deleteGear=function(){const out=baseDeleteGear.apply(this,arguments);setTimeout(renderGearPremium,0);return out};
+
+/* ---------- Ride editing + quiet secondary menus ---------- */
+window.openRideMenu=id=>{const r=rideById(id);if(!r)return;modal(`<div class="modalhead compact"><div><div class="kicker">RIDE OPTIONS</div><h3>${esc(r.name)}</h3></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="quiet-menu"><button onclick="editRide('${id}')"><span>✎</span><div><strong>Edit ride</strong><small>Name, dates, number of days and status</small></div></button><button class="destructive" onclick="confirmDeleteRide('${id}')"><span>×</span><div><strong>Delete ride</strong><small>Remove this ride and its saved ride data</small></div></button></div>`)};
+window.openRouteMenu=(rideId,di,si)=>{const s=rideById(rideId)?.days?.[di]?.segments?.[si];if(!s)return;modal(`<div class="modalhead compact"><div><div class="kicker">ROUTE OPTIONS</div><h3>${esc(s.label||`Route ${si+1}`)}</h3></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="quiet-menu"><button onclick="editRoutePart('${rideId}',${di},${si})"><span>✎</span><div><strong>Edit route</strong><small>Origin, destination and waypoints</small></div></button><button class="destructive" onclick="confirmDeleteRoutePart('${rideId}',${di},${si})"><span>×</span><div><strong>Delete route</strong><small>Remove this route part from Day ${di+1}</small></div></button></div>`)};
+window.openDayMenu=(rideId,di)=>modal(`<div class="modalhead compact"><div><div class="kicker">DAY ${di+1}</div><h3>Day options</h3></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="quiet-menu"><button onclick="editRideDay('${rideId}',${di})"><span>✎</span><div><strong>Edit day</strong><small>Title, date, start and destination</small></div></button><button onclick="addRideTask('${rideId}',${di})"><span>＋</span><div><strong>Add timeline task</strong><small>Add a stop, break or reminder</small></div></button><button onclick="addRoutePart('${rideId}',${di})"><span>⌖</span><div><strong>Add route part</strong><small>Add a route for navigation</small></div></button></div>`);
+window.editRide=id=>{const r=rideById(id);if(!r)return;modal(`<div class="modalhead"><div><div class="kicker">EDIT RIDE</div><h3>${esc(r.name)}</h3></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="field"><label>RIDE NAME</label><input id="editRideName" value="${esc(r.name)}"></div><div class="grid2"><div class="field"><label>START DATE</label><input id="editRideStart" type="date" value="${esc(r.start||today())}"></div><div class="field"><label>NUMBER OF DAYS</label><input id="editRideDays" inputmode="numeric" value="${r.days.length}"></div></div><div class="field"><label>STATUS</label><select id="editRideStatus"><option value="planned" ${r.status!=='completed'?'selected':''}>Planned</option><option value="completed" ${r.status==='completed'?'selected':''}>Completed</option></select></div><div class="modal-actions"><button class="ghost" onclick="closeModal()">Cancel</button><button class="primary" onclick="saveRideEdit('${id}')">Save ride</button></div>`)};
+window.saveRideEdit=id=>{const r=rideById(id);if(!r)return;const name=$('#editRideName')?.value.trim(),start=$('#editRideStart')?.value||r.start||today(),count=Math.max(1,Math.min(60,Math.round(Number($('#editRideDays')?.value||r.days.length))));if(!name)return toast('Add a ride name');if(count<r.days.length&&r.days.slice(count).some(d=>(d.tasks||[]).length||(d.segments||[]).length))return toast('Clear tasks and route parts from removed days before shortening this ride');while(r.days.length<count){const i=r.days.length;r.days.push({day:i+1,date:addDays(start,i),title:`Day ${i+1}`,from:'',to:'',segments:[],tasks:[]})}r.days=r.days.slice(0,count).map((d,i)=>({...d,day:i+1,date:addDays(start,i)}));r.name=name;r.start=start;r.end=addDays(start,count-1);r.status=$('#editRideStatus')?.value||'planned';r.selectedDay=Math.min(r.selectedDay||0,count-1);save();close();setTimeout(renderRidesPremium,0);toast('Ride updated')};
 window.confirmDeleteRide=id=>{const r=rideById(id);if(!r)return;modal(`<div class="modalhead"><div><div class="kicker">DELETE RIDE</div><h3>Delete ${esc(r.name)}?</h3></div></div><div class="connection-note danger-note">This removes this ride, all of its days, route parts, tasks, notes, expenses and fuel logs from Rider Hub.</div><div class="modal-actions"><button class="ghost" onclick="closeModal()">Cancel</button><button class="danger" onclick="deleteRide('${id}')">Delete ride</button></div>`)};
-window.deleteRide=id=>{S().rides=(S().rides||[]).filter(r=>r.id!==id);S().ui.rideId='';save();close();renderRidesPremium();toast('Ride deleted')};
-
-window.editRoutePart=(rideId,di,si)=>{
-  const s=rideById(rideId)?.days?.[di]?.segments?.[si];if(!s)return;
-  modal(`<div class="modalhead"><div><div class="kicker">ROUTE PART</div><h3>Edit route</h3></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="field"><label>LABEL</label><input id="editSegLabel" value="${esc(s.label||'')}"></div><div class="field"><label>ORIGIN</label><input id="editSegOrigin" value="${esc(s.origin||'')}"></div><div class="field"><label>DESTINATION</label><input id="editSegDest" value="${esc(s.destination||'')}"></div><div class="field"><label>WAYPOINTS · one per line</label><textarea id="editSegWaypoints">${esc((s.waypoints||[]).join('\n'))}</textarea></div><div class="modal-actions"><button class="ghost" onclick="closeModal()">Cancel</button><button class="primary" onclick="saveEditedRoutePart('${rideId}',${di},${si})">Save route</button></div>`);
-};
-window.saveEditedRoutePart=(rideId,di,si)=>{
-  const s=rideById(rideId)?.days?.[di]?.segments?.[si],origin=$('#editSegOrigin')?.value.trim(),destination=$('#editSegDest')?.value.trim();if(!s||!origin||!destination)return toast('Add origin and destination');
-  Object.assign(s,{label:$('#editSegLabel')?.value.trim()||`Route ${si+1}`,origin,destination,waypoints:($('#editSegWaypoints')?.value||'').split('\n').map(x=>x.trim()).filter(Boolean)});
-  save();close();renderRidesPremium();refreshRideModeIfOpen(rideId);toast('Route updated');
-};
+window.deleteRide=id=>{S().rides=(S().rides||[]).filter(r=>r.id!==id);S().ui.rideId='';save();close();setTimeout(renderRidesPremium,0);toast('Ride deleted')};
+window.editRoutePart=(rideId,di,si)=>{const s=rideById(rideId)?.days?.[di]?.segments?.[si];if(!s)return;modal(`<div class="modalhead"><div><div class="kicker">ROUTE PART</div><h3>Edit route</h3></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="field"><label>LABEL</label><input id="editSegLabel" value="${esc(s.label||'')}"></div><div class="field"><label>ORIGIN</label><input id="editSegOrigin" value="${esc(s.origin||'')}"></div><div class="field"><label>DESTINATION</label><input id="editSegDest" value="${esc(s.destination||'')}"></div><div class="field"><label>WAYPOINTS · one per line</label><textarea id="editSegWaypoints">${esc((s.waypoints||[]).join('\n'))}</textarea></div><div class="modal-actions"><button class="ghost" onclick="closeModal()">Cancel</button><button class="primary" onclick="saveEditedRoutePart('${rideId}',${di},${si})">Save route</button></div>`)};
+window.saveEditedRoutePart=(rideId,di,si)=>{const s=rideById(rideId)?.days?.[di]?.segments?.[si],origin=$('#editSegOrigin')?.value.trim(),destination=$('#editSegDest')?.value.trim();if(!s||!origin||!destination)return toast('Add origin and destination');Object.assign(s,{label:$('#editSegLabel')?.value.trim()||`Route ${si+1}`,origin,destination,waypoints:($('#editSegWaypoints')?.value||'').split('\n').map(x=>x.trim()).filter(Boolean)});save();close();setTimeout(()=>{renderRidesPremium();refreshRideModeIfOpen(rideId)},0);toast('Route updated')};
 window.confirmDeleteRoutePart=(rideId,di,si)=>{const s=rideById(rideId)?.days?.[di]?.segments?.[si];if(!s)return;modal(`<div class="modalhead"><div><div class="kicker">DELETE ROUTE</div><h3>${esc(s.label||'Route part')}</h3></div></div><div class="connection-note danger-note">Delete this route part from Day ${di+1}?</div><div class="modal-actions"><button class="ghost" onclick="closeModal()">Cancel</button><button class="danger" onclick="deleteRoutePart('${rideId}',${di},${si})">Delete route</button></div>`)};
-window.deleteRoutePart=(rideId,di,si)=>{const d=rideById(rideId)?.days?.[di];if(!d)return;d.segments.splice(si,1);save();close();renderRidesPremium();refreshRideModeIfOpen(rideId);toast('Route deleted')};
-
+window.deleteRoutePart=(rideId,di,si)=>{const d=rideById(rideId)?.days?.[di];if(!d)return;d.segments.splice(si,1);save();close();setTimeout(()=>{renderRidesPremium();refreshRideModeIfOpen(rideId)},0);toast('Route deleted')};
 window.editRideTask=(rideId,di,ti)=>{const t=rideById(rideId)?.days?.[di]?.tasks?.[ti];if(!t)return;modal(`<div class="modalhead"><div><div class="kicker">TIMELINE</div><h3>Edit task</h3></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="grid2"><div class="field"><label>TIME</label><input id="editTaskTime" type="time" value="${esc(t.time||'')}"></div><div class="field"><label>TITLE</label><input id="editTaskTitle" value="${esc(t.title||'')}"></div></div><div class="field"><label>NOTE</label><input id="editTaskNote" value="${esc(t.note||'')}"></div><div class="modal-actions"><button class="ghost" onclick="closeModal()">Cancel</button><button class="primary" onclick="saveEditedRideTask('${rideId}',${di},${ti})">Save task</button></div>`)};
-window.saveEditedRideTask=(rideId,di,ti)=>{const d=rideById(rideId)?.days?.[di],t=d?.tasks?.[ti],title=$('#editTaskTitle')?.value.trim();if(!t||!title)return toast('Add a task title');t.time=$('#editTaskTime')?.value||'';t.title=title;t.note=$('#editTaskNote')?.value.trim()||'';d.tasks.sort((a,b)=>String(a.time).localeCompare(String(b.time)));save();close();renderRidesPremium();refreshRideModeIfOpen(rideId);toast('Task updated')};
+window.saveEditedRideTask=(rideId,di,ti)=>{const d=rideById(rideId)?.days?.[di],t=d?.tasks?.[ti],title=$('#editTaskTitle')?.value.trim();if(!t||!title)return toast('Add a task title');t.time=$('#editTaskTime')?.value||'';t.title=title;t.note=$('#editTaskNote')?.value.trim()||'';d.tasks.sort((a,b)=>String(a.time).localeCompare(String(b.time)));save();close();setTimeout(()=>{renderRidesPremium();refreshRideModeIfOpen(rideId)},0);toast('Task updated')};
 window.confirmDeleteRideTask=(rideId,di,ti)=>{const t=rideById(rideId)?.days?.[di]?.tasks?.[ti];if(!t)return;modal(`<div class="modalhead"><div><div class="kicker">DELETE TASK</div><h3>${esc(t.title)}</h3></div></div><div class="modal-actions"><button class="ghost" onclick="closeModal()">Cancel</button><button class="danger" onclick="deleteRideTask('${rideId}',${di},${ti})">Delete task</button></div>`)};
-window.deleteRideTask=(rideId,di,ti)=>{const d=rideById(rideId)?.days?.[di];if(!d)return;d.tasks.splice(ti,1);save();close();renderRidesPremium();refreshRideModeIfOpen(rideId);toast('Task deleted')};
+window.deleteRideTask=(rideId,di,ti)=>{const d=rideById(rideId)?.days?.[di];if(!d)return;d.tasks.splice(ti,1);save();close();setTimeout(()=>{renderRidesPremium();refreshRideModeIfOpen(rideId)},0);toast('Task deleted')};
 
-/* ---------- Premium My Rides ---------- */
-function routeText(d){return [d?.from,d?.to].filter(Boolean).join(' → ')||d?.title||'Route not added yet'}
-function rideCard(r){
-  const pct=rideProgress(r),first=r.days?.[0],last=r.days?.[r.days.length-1];
-  const route=[first?.from,last?.to].filter(Boolean).join(' → ')||'Open the ride to add route details';
-  return `<article class="premium-ride-card"><div class="premium-ride-main"><div class="ride-status-line"><span class="status-chip ${r.status==='completed'?'complete':'planned'}">${r.status==='completed'?'COMPLETED':'PLANNED'}</span><span>${r.days.length} day${r.days.length===1?'':'s'}</span></div><h3>${esc(r.name)}</h3><p class="ride-route-line">${esc(route)}</p><div class="ride-date-line">${fmtDate(r.start)}${r.end&&r.end!==r.start?' → '+fmtDate(r.end):''}</div><div class="progress premium-progress"><i style="width:${pct}%"></i></div><div class="ride-progress-label"><span>${pct}% complete</span><span>${(r.days||[]).reduce((a,d)=>a+(d.tasks||[]).length,0)} timeline items</span></div></div><div class="ride-card-actions"><button class="primary" onclick="openRide('${r.id}')">Open plan</button><button class="ghost" onclick="openRideMode('${r.id}')">Ride Mode</button><button class="icon-action" onclick="editRide('${r.id}')" aria-label="Edit ride">✎</button><button class="icon-action danger-icon" onclick="confirmDeleteRide('${r.id}')" aria-label="Delete ride">×</button></div></article>`;
-}
-function renderRidesPremium(){
-  const root=$('#rides');if(!root)return;
-  const current=S().ui?.rideId&&rideById(S().ui.rideId);
-  if(current)return renderRideDetailPremium(current);
-  const rides=S().rides||[],planned=rides.filter(r=>r.status!=='completed'),completed=rides.filter(r=>r.status==='completed'),tourDays=completed.reduce((a,r)=>a+(r.days?.length||0),0),allDays=rides.reduce((a,r)=>a+(r.days?.length||0),0);
-  root.innerHTML=`<div class="rh-premium-rides"><section class="rides-hero-premium"><div><div class="kicker">MY RIDES</div><h1>Plan the road. Keep the day clear.</h1><p>Every ride can be one day or many. Routes, timeline, expenses and Ride Mode stay attached to the same plan.</p></div><button class="primary ride-create" onclick="addRide()">+ Add ride</button></section><div class="ride-stats-premium"><div><span>PLANNED</span><strong>${planned.length}</strong><small>rides</small></div><div><span>COMPLETED</span><strong>${completed.length}</strong><small>rides</small></div><div><span>TOURING DAYS</span><strong>${tourDays}</strong><small>completed</small></div><div><span>ALL DAYS</span><strong>${allDays}</strong><small>planned + completed</small></div></div>${rides.length?`<div class="premium-rides-list">${planned.map(rideCard).join('')}${completed.map(rideCard).join('')}</div>`:`<div class="premium-empty-ride"><span>↗</span><h2>Your next ride starts here.</h2><p>Create a one-day spin, a weekend route or a long tour. Rider Hub uses the same simple day model for all of them.</p><button class="primary" onclick="addRide()">Add first ride</button></div>`}</div>`;
-}
-function routeCardPremium(r,d,s,i){
-  return `<div class="premium-route-card"><div class="route-number">${String(i+1).padStart(2,'0')}</div><div class="route-content"><strong>${esc(s.label||`Route ${i+1}`)}</strong><p>${esc([s.origin,...(s.waypoints||[]),s.destination].filter(Boolean).join(' → '))}</p><div class="route-actions"><button class="primary" onclick="openMap('${r.id}',${d.day-1},${i})">Navigate</button><button class="ghost" onclick="editRoutePart('${r.id}',${d.day-1},${i})">Edit</button><button class="text-danger" onclick="confirmDeleteRoutePart('${r.id}',${d.day-1},${i})">Delete</button></div></div></div>`;
-}
-function taskPremium(r,d,t,i){
-  return `<div class="premium-task ${esc(t.status||'upcoming')}"><div class="task-time">${esc(t.time||'—')}</div><div class="task-body"><strong>${esc(t.title)}</strong><p>${esc(t.note||'')}${t.delay?` · delayed ${t.delay} min`:''}</p></div><button class="task-state" onclick="taskMenu('${r.id}',${d.day-1},${i})">${esc((t.status||'upcoming').toUpperCase())}</button></div>`;
-}
-function renderRideDetailPremium(r){
-  const root=$('#rides');if(!root)return;
-  const di=Math.max(0,Math.min((r.days?.length||1)-1,r.selectedDay||0)),d=r.days[di],pct=rideProgress(r);
-  root.innerHTML=`<div class="rh-premium-rides"><div class="ride-detail-nav"><button class="text-action" onclick="closeRide()">← My rides</button><div class="ride-detail-actions"><button class="ghost" onclick="editRide('${r.id}')">Edit ride</button><button class="text-danger" onclick="confirmDeleteRide('${r.id}')">Delete</button></div></div><section class="ride-detail-hero"><div><div class="kicker">${r.status==='completed'?'COMPLETED RIDE':'RIDE PLAN'}</div><h1>${esc(r.name)}</h1><p>${r.days.length} day${r.days.length===1?'':'s'} · ${fmtDate(r.start)}${r.end&&r.end!==r.start?' → '+fmtDate(r.end):''}</p></div><div class="ride-completion-ring"><strong>${pct}%</strong><span>complete</span></div></section><div class="progress premium-progress hero-progress"><i style="width:${pct}%"></i></div><div class="ride-detail-command"><div><div class="kicker">CHOOSE DAY</div><h2>Day ${di+1} of ${r.days.length}</h2></div><button class="primary" onclick="openRideMode('${r.id}')">Start Ride Mode</button></div><div class="daytabs premium-daytabs">${r.days.map((x,i)=>`<button class="daytab ${i===di?'active':''}" onclick="selectRideDay('${r.id}',${i})"><b>Day ${i+1}</b><span>${x.date?fmtDate(x.date).replace(/, \d{4}$/,''):''}</span></button>`).join('')}</div><div class="ride-detail-grid"><section><div class="day-title-card"><div><div class="kicker">DAY ${di+1}</div><h2>${esc(d.title||`Day ${di+1}`)}</h2><p>${esc(routeText(d))}</p></div><button class="ghost" onclick="editRideDay('${r.id}',${di})">Edit day</button></div><div class="premium-section-head"><div><span>SCHEDULE</span><h2>Timeline</h2></div><button class="ghost" onclick="addRideTask('${r.id}',${di})">+ Task</button></div><div class="premium-timeline">${d.tasks?.length?d.tasks.map((t,i)=>taskPremium(r,d,t,i)).join(''):`<div class="premium-empty-inline"><strong>No timeline yet</strong><p>Add the first stop, break or task for this day.</p></div>`}</div></section><aside><div class="premium-section-head"><div><span>MAP</span><h2>Route parts</h2></div><button class="ghost" onclick="addRoutePart('${r.id}',${di})">+ Route</button></div><div class="premium-route-list">${d.segments?.length?d.segments.map((s,i)=>routeCardPremium(r,d,s,i)).join(''):`<div class="premium-empty-inline"><strong>No route parts yet</strong><p>Add an origin, destination and optional waypoints.</p></div>`}</div></aside></div></div>`;
-}
+/* ---------- My Rides ---------- */
+function routeText(d){return[d?.from,d?.to].filter(Boolean).join(' → ')||d?.title||'Route not added yet'}
+function rideRoute(r){const first=r.days?.[0],last=r.days?.[r.days.length-1];return[first?.from,last?.to].filter(Boolean).join(' → ')||'Open the ride to add route details'}
+function featuredRideCard(r){const pct=rideProgress(r);return`<article class="featured-ride-card"><div class="featured-copy"><div class="ride-status-line"><span class="status-chip planned">NEXT RIDE</span><span>${r.days.length} day${r.days.length===1?'':'s'}</span></div><h2>${esc(r.name)}</h2><p>${esc(rideRoute(r))}</p><div class="ride-date-line">${fmtDate(r.start)}${r.end&&r.end!==r.start?' → '+fmtDate(r.end):''}</div><div class="progress premium-progress"><i style="width:${pct}%"></i></div><div class="ride-progress-label"><span><strong>${pct}%</strong> complete</span><span>${completedTasks(r)} of ${totalTasks(r)} timeline items</span></div></div><div class="featured-actions"><button class="primary" onclick="openRide('${r.id}')">Open ride</button><button class="ghost" onclick="openRideMode('${r.id}')">Ride Mode</button><button class="overflow-action" onclick="openRideMenu('${r.id}')" aria-label="Ride options">•••</button></div></article>`}
+function rideCard(r){const pct=rideProgress(r);return`<article class="premium-ride-card"><div class="premium-ride-main"><div class="ride-status-line"><span class="status-chip ${r.status==='completed'?'complete':'planned'}">${r.status==='completed'?'COMPLETED':'PLANNED'}</span><span>${r.days.length} day${r.days.length===1?'':'s'}</span></div><h3>${esc(r.name)}</h3><p class="ride-route-line">${esc(rideRoute(r))}</p><div class="ride-date-line">${fmtDate(r.start)}${r.end&&r.end!==r.start?' → '+fmtDate(r.end):''}</div><div class="progress premium-progress"><i style="width:${pct}%"></i></div><div class="ride-progress-label"><span>${pct}% complete</span><span>${completedTasks(r)}/${totalTasks(r)} items</span></div></div><div class="ride-card-actions"><button class="primary" onclick="openRide('${r.id}')">Open</button><button class="ghost" onclick="openRideMode('${r.id}')">Ride Mode</button><button class="overflow-action" onclick="openRideMenu('${r.id}')" aria-label="Ride options">•••</button></div></article>`}
+function renderRidesPremium(){const root=$('#rides');if(!root)return;const current=S().ui?.rideId&&rideById(S().ui.rideId);if(current)return renderRideDetailPremium(current);const rides=S().rides||[],planned=rides.filter(r=>r.status!=='completed'),completed=rides.filter(r=>r.status==='completed'),tourDays=completed.reduce((a,r)=>a+(r.days?.length||0),0),featured=planned[0]||null,rest=rides.filter(r=>r!==featured);root.innerHTML=`<div class="rh-premium-rides"><section class="rides-hero-premium"><div><div class="kicker">MY RIDES</div><h1>Plan the road. Keep the day clear.</h1><p>One day or twenty — each ride keeps its route, timeline and Ride Mode together.</p></div><button class="primary ride-create" onclick="addRide()">+ Add ride</button></section>${featured?featuredRideCard(featured):''}<div class="ride-stats-premium"><div><span>PLANNED</span><strong>${planned.length}</strong><small>rides</small></div><div><span>COMPLETED</span><strong>${completed.length}</strong><small>rides</small></div><div><span>TOURING DAYS</span><strong>${tourDays}</strong><small>completed</small></div></div>${rest.length?`<div class="premium-section-title"><span>${featured?'OTHER RIDES':'RIDES'}</span></div><div class="premium-rides-list">${rest.map(rideCard).join('')}</div>`:!featured?`<div class="premium-empty-ride"><span>↗</span><h2>Your next ride starts here.</h2><p>Create a one-day spin, a weekend route or a long tour.</p><button class="primary" onclick="addRide()">Add first ride</button></div>`:''}</div>`}
+function routeCardPremium(r,d,s,i){return`<div class="premium-route-card"><div class="route-number">${String(i+1).padStart(2,'0')}</div><div class="route-content"><strong>${esc(s.label||`Route ${i+1}`)}</strong><p>${esc([s.origin,...(s.waypoints||[]),s.destination].filter(Boolean).join(' → '))}</p><div class="route-actions"><button class="primary" onclick="openMap('${r.id}',${d.day-1},${i})">Navigate</button><button class="overflow-action" onclick="openRouteMenu('${r.id}',${d.day-1},${i})" aria-label="Route options">•••</button></div></div></div>`}
+function taskPremium(r,d,t,i){return`<div class="premium-task ${esc(t.status||'upcoming')}"><div class="task-time">${esc(t.time||'—')}</div><div class="task-body"><strong>${esc(t.title)}</strong><p>${esc(t.note||'')}${t.delay?` · delayed ${t.delay} min`:''}</p></div><button class="task-state" onclick="taskMenu('${r.id}',${d.day-1},${i})">${esc((t.status||'upcoming').toUpperCase())}</button></div>`}
+function renderRideDetailPremium(r){const root=$('#rides');if(!root)return;const di=Math.max(0,Math.min((r.days?.length||1)-1,r.selectedDay||0)),d=r.days[di],pct=rideProgress(r);root.innerHTML=`<div class="rh-premium-rides"><div class="ride-detail-nav"><button class="back-action" onclick="closeRide()" aria-label="Back to My rides">‹</button><button class="overflow-action" onclick="openRideMenu('${r.id}')" aria-label="Ride options">•••</button></div><section class="ride-detail-hero"><div><div class="kicker">${r.status==='completed'?'COMPLETED RIDE':'RIDE PLAN'}</div><h1>${esc(r.name)}</h1><p>${r.days.length} day${r.days.length===1?'':'s'} · ${fmtDate(r.start)}${r.end&&r.end!==r.start?' → '+fmtDate(r.end):''}</p></div><div class="ride-completion-ring"><strong>${pct}%</strong><span>${completedTasks(r)}/${totalTasks(r)} items</span></div></section><div class="progress premium-progress hero-progress"><i style="width:${pct}%"></i></div><div class="ride-detail-command"><div><div class="kicker">CHOOSE DAY</div><h2>Day ${di+1} of ${r.days.length}</h2></div><button class="primary" onclick="openRideMode('${r.id}')">Start Ride Mode</button></div><div class="daytabs premium-daytabs">${r.days.map((x,i)=>`<button class="daytab ${i===di?'active':''}" onclick="selectRideDay('${r.id}',${i})"><b>Day ${i+1}</b><span>${x.date?fmtDate(x.date).replace(/, \d{4}$/,''):''}</span></button>`).join('')}</div><div class="ride-detail-grid"><section><div class="day-title-card"><div><div class="kicker">DAY ${di+1}</div><h2>${esc(d.title||`Day ${di+1}`)}</h2><p>${esc(routeText(d))}</p></div><button class="overflow-action" onclick="openDayMenu('${r.id}',${di})" aria-label="Day options">•••</button></div><div class="premium-section-head"><div><span>SCHEDULE</span><h2>Timeline</h2></div><button class="quiet-add" onclick="addRideTask('${r.id}',${di})">+ Task</button></div><div class="premium-timeline">${d.tasks?.length?d.tasks.map((t,i)=>taskPremium(r,d,t,i)).join(''):`<div class="premium-empty-inline"><strong>No timeline yet</strong><p>Add the first stop, break or task for this day.</p></div>`}</div></section><aside><div class="premium-section-head"><div><span>MAP</span><h2>Route parts</h2></div><button class="quiet-add" onclick="addRoutePart('${r.id}',${di})">+ Route</button></div><div class="premium-route-list">${d.segments?.length?d.segments.map((s,i)=>routeCardPremium(r,d,s,i)).join(''):`<div class="premium-empty-inline"><strong>No route parts yet</strong><p>Add an origin, destination and optional waypoints.</p></div>`}</div></aside></div></div>`}
 window.renderRides=renderRidesPremium;
-window.openRide=id=>{const r=rideById(id);if(!r)return;S().ui.rideId=id;r.selectedDay=Math.max(0,Math.min(r.days.length-1,r.selectedDay||0));save();renderRidesPremium();window.scrollTo(0,0)};
-window.closeRide=()=>{S().ui.rideId='';save();renderRidesPremium();window.scrollTo(0,0)};
-window.selectRideDay=(id,i)=>{const r=rideById(id);if(!r)return;r.selectedDay=Math.max(0,Math.min(r.days.length-1,i));save();renderRidesPremium()};
+window.openRide=id=>{const r=rideById(id);if(!r)return;if(S().ui.page!=='rides')baseSetPage?.('rides');S().ui.page='rides';S().ui.rideId=id;r.selectedDay=Math.max(0,Math.min(r.days.length-1,r.selectedDay||0));persist();renderRidesPremium();if(!restoringHistory)pushNav({page:'rides',rideId:id,rideMode:false,modal:false});window.scrollTo(0,0)};
+window.closeRide=()=>{if(!restoringHistory&&history.state?.rh&&history.state.rideId&&!history.state.rideMode)return history.back();S().ui.rideId='';persist();renderRidesPremium();replaceNav({rideId:'',rideMode:false,modal:false});window.scrollTo(0,0)};
+window.selectRideDay=(id,i)=>{const r=rideById(id);if(!r)return;r.selectedDay=Math.max(0,Math.min(r.days.length-1,i));persist();renderRidesPremium();replaceNav({rideId:id,rideMode:false,modal:false})};
 
-/* ---------- Premium Ride Mode ---------- */
-const baseOpenRideMode=window.openRideMode;
-const baseRideModeDay=window.rideModeDay;
-const baseRideModeTask=window.rideModeTask;
-const baseCloseRideMode=window.closeRideMode;
+/* ---------- Ride Mode ---------- */
 function nextTask(d){return(d?.tasks||[]).find(t=>!['done','skipped'].includes(t.status))||null}
-function renderRideModePremium(r){
-  const shell=$('#rideMode'),root=$('#rideModeInner');if(!shell||!root||!r)return;
-  const di=Math.max(0,Math.min(r.days.length-1,r.selectedDay||0)),d=r.days[di],n=nextTask(d),done=(d.tasks||[]).filter(t=>['done','skipped'].includes(t.status)).length,pct=d.tasks?.length?Math.round(done/d.tasks.length*100):0;
-  root.innerHTML=`<div class="premium-ride-mode"><header class="ride-mode-top"><div><div class="kicker">RIDE MODE · DAY ${di+1} OF ${r.days.length}</div><h1>${esc(r.name)}</h1><p>${esc(d.title||`Day ${di+1}`)}</p></div><button class="iconbtn" onclick="closeRideMode()">×</button></header><div class="daytabs premium-daytabs ride-mode-days">${r.days.map((x,i)=>`<button class="daytab ${i===di?'active':''}" onclick="rideModeDay('${r.id}',${i})"><b>Day ${i+1}</b><span>${x.date?fmtDate(x.date).replace(/, \d{4}$/,''):''}</span></button>`).join('')}</div><section class="ride-focus-card"><div class="focus-meta"><span>${n?esc(n.time||'NEXT'):'DAY COMPLETE'}</span><span>${done}/${d.tasks.length} done</span></div><h2>${esc(n?.title||'All tasks complete')}</h2><p>${esc(n?.note||'Choose another day, review the route or close Ride Mode.')}</p><div class="progress premium-progress"><i style="width:${pct}%"></i></div>${n?`<div class="focus-actions"><button class="primary" onclick="rideModeTask('${r.id}',${di},${d.tasks.indexOf(n)},'done')">Done</button><button class="ghost" onclick="delayTask('${r.id}',${di},${d.tasks.indexOf(n)})">Delay</button><button class="ghost" onclick="rideModeTask('${r.id}',${di},${d.tasks.indexOf(n)},'skipped')">Skip</button></div>`:''}</section><div class="ride-mode-workspace"><main><div class="premium-section-head"><div><span>DAY ${di+1}</span><h2>Timeline</h2></div><button class="ghost" onclick="addRideTask('${r.id}',${di})">+ Task</button></div><div class="premium-timeline">${d.tasks?.length?d.tasks.map((t,i)=>taskPremium(r,d,t,i)).join(''):`<div class="premium-empty-inline"><strong>No timeline yet</strong><p>Add a task to build this ride day.</p></div>`}</div><div class="premium-section-head"><div><span>ROUTE</span><h2>Route parts</h2></div><button class="ghost" onclick="addRoutePart('${r.id}',${di})">+ Route</button></div><div class="premium-route-list">${d.segments?.length?d.segments.map((s,i)=>routeCardPremium(r,d,s,i)).join(''):`<div class="premium-empty-inline"><strong>No route yet</strong><p>Add a route part to navigate this day.</p></div>`}</div></main><aside class="ride-tools-panel"><div class="premium-section-head"><div><span>TOOLS</span><h2>Ride controls</h2></div></div><div class="premium-tools"><button onclick="rideMapMenu('${r.id}')"><b>⌖</b><span>Map</span></button><button onclick="openExpenses('${r.id}')"><b>₹</b><span>Expenses</span></button><button onclick="openFuel('${r.id}')"><b>⛽</b><span>Fuel log</span></button><button onclick="openRideNotes('${r.id}')"><b>✎</b><span>Notes</span></button><button onclick="openPacking('${r.id}')"><b>▣</b><span>Packing</span></button><button onclick="openEmergency()"><b>SOS</b><span>Emergency</span></button><button onclick="rideSummary('${r.id}')"><b>Σ</b><span>Summary</span></button><button onclick="tomorrowPreview('${r.id}')"><b>→</b><span>Tomorrow</span></button><button onclick="editRideDay('${r.id}',${di})"><b>✎</b><span>Edit day</span></button><button onclick="addRideTask('${r.id}',${di})"><b>＋</b><span>Add task</span></button></div></aside></div></div>`;
-}
-window.openRideMode=id=>{baseOpenRideMode?.(id);const r=rideById(id);if(r)renderRideModePremium(r)};
-window.rideModeDay=(id,i)=>{baseRideModeDay?.(id,i);const r=rideById(id);if(r)renderRideModePremium(r)};
+function renderRideModePremium(r){const shell=$('#rideMode'),root=$('#rideModeInner');if(!shell||!root||!r)return;const di=Math.max(0,Math.min(r.days.length-1,r.selectedDay||0)),d=r.days[di],n=nextTask(d),done=(d.tasks||[]).filter(t=>['done','skipped'].includes(t.status)).length,total=d.tasks?.length||0,pct=total?Math.round(done/total*100):0;root.innerHTML=`<div class="premium-ride-mode"><header class="ride-mode-top"><div><div class="kicker">RIDE MODE · DAY ${di+1} OF ${r.days.length}</div><h1>${esc(r.name)}</h1><p>${esc(d.title||`Day ${di+1}`)}</p></div><button class="iconbtn" onclick="closeRideMode()">×</button></header><div class="daytabs premium-daytabs ride-mode-days">${r.days.map((x,i)=>`<button class="daytab ${i===di?'active':''}" onclick="rideModeDay('${r.id}',${i})"><b>Day ${i+1}</b><span>${x.date?fmtDate(x.date).replace(/, \d{4}$/,''):''}</span></button>`).join('')}</div><div class="ride-priority-actions"><button onclick="rideMapMenu('${r.id}')"><b>⌖</b><span>Map</span></button><button onclick="openExpenses('${r.id}')"><b>₹</b><span>Expenses</span></button><button class="sos" onclick="openEmergency()"><b>SOS</b><span>Emergency</span></button><button onclick="tomorrowPreview('${r.id}')"><b>→</b><span>Tomorrow</span></button></div><section class="ride-focus-card"><div class="focus-meta"><span>${n?esc(n.time||'NEXT'):'DAY COMPLETE'}</span><span class="focus-progress"><strong>${pct}%</strong> · ${done} of ${total} complete</span></div><h2>${esc(n?.title||'All tasks complete')}</h2><p>${esc(n?.note||'Choose another day, review the route or close Ride Mode.')}</p><div class="progress premium-progress"><i style="width:${pct}%"></i></div>${n?`<div class="focus-actions"><button class="primary" onclick="rideModeTask('${r.id}',${di},${d.tasks.indexOf(n)},'done')">Done</button><button class="ghost" onclick="delayTask('${r.id}',${di},${d.tasks.indexOf(n)})">Delay</button><button class="ghost" onclick="rideModeTask('${r.id}',${di},${d.tasks.indexOf(n)},'skipped')">Skip</button></div>`:''}</section><div class="ride-mode-workspace"><main><div class="premium-section-head"><div><span>DAY ${di+1}</span><h2>Timeline</h2></div><button class="quiet-add" onclick="addRideTask('${r.id}',${di})">+ Task</button></div><div class="premium-timeline">${d.tasks?.length?d.tasks.map((t,i)=>taskPremium(r,d,t,i)).join(''):`<div class="premium-empty-inline"><strong>No timeline yet</strong><p>Add a task to build this ride day.</p></div>`}</div><div class="premium-section-head"><div><span>ROUTE</span><h2>Route parts</h2></div><button class="quiet-add" onclick="addRoutePart('${r.id}',${di})">+ Route</button></div><div class="premium-route-list">${d.segments?.length?d.segments.map((s,i)=>routeCardPremium(r,d,s,i)).join(''):`<div class="premium-empty-inline"><strong>No route yet</strong><p>Add a route part to navigate this day.</p></div>`}</div></main><aside class="ride-tools-panel"><div class="premium-section-head"><div><span>MORE TOOLS</span><h2>Ride controls</h2></div></div><div class="premium-tools"><button onclick="openFuel('${r.id}')"><b>⛽</b><span>Fuel log</span></button><button onclick="openRideNotes('${r.id}')"><b>✎</b><span>Notes</span></button><button onclick="openPacking('${r.id}')"><b>▣</b><span>Packing</span></button><button onclick="rideSummary('${r.id}')"><b>Σ</b><span>Summary</span></button><button onclick="editRideDay('${r.id}',${di})"><b>✎</b><span>Edit day</span></button><button onclick="addRideTask('${r.id}',${di})"><b>＋</b><span>Add task</span></button></div></aside></div></div>`}
+window.openRideMode=id=>{const r=rideById(id);if(!r)return;if(S().ui.page!=='rides')baseSetPage?.('rides');S().ui.page='rides';S().ui.rideId=id;persist();baseOpenRideMode?.(id);renderRideModePremium(r);if(!restoringHistory)pushNav({page:'rides',rideId:id,rideMode:true,modal:false})};
+window.rideModeDay=(id,i)=>{baseRideModeDay?.(id,i);const r=rideById(id);if(r){renderRideModePremium(r);replaceNav({page:'rides',rideId:id,rideMode:true,modal:false})}};
 window.rideModeTask=(id,di,ti,status)=>{baseRideModeTask?.(id,di,ti,status);const r=rideById(id);if(r)renderRideModePremium(r)};
-window.closeRideMode=()=>{baseCloseRideMode?.();renderRidesPremium()};
+window.closeRideMode=()=>{if(!restoringHistory&&history.state?.rh&&history.state.rideMode)return history.back();baseCloseRideMode?.();renderRidesPremium();replaceNav({page:'rides',rideId:S().ui.rideId||'',rideMode:false,modal:false})};
 function refreshRideModeIfOpen(id){if($('#rideMode')?.classList.contains('open')){const r=rideById(id);if(r)renderRideModePremium(r)}}
 window.rideMapMenu=id=>{const r=rideById(id),di=r?.selectedDay||0,d=r?.days?.[di];if(!d)return;modal(`<div class="modalhead"><div><div class="kicker">MAP · DAY ${di+1}</div><h3>Route parts</h3></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="premium-route-list">${d.segments?.length?d.segments.map((s,i)=>routeCardPremium(r,d,s,i)).join(''):`<div class="premium-empty-inline"><strong>No route parts</strong><p>Add a route part for this day.</p></div>`}</div><button class="primary full" style="margin-top:12px" onclick="addRoutePart('${id}',${di})">+ Add route part</button>`)};
-window.taskMenu=(rideId,di,ti)=>{const t=rideById(rideId)?.days?.[di]?.tasks?.[ti];if(!t)return;modal(`<div class="modalhead"><div><div class="kicker">TIMELINE TASK</div><h3>${esc(t.title)}</h3><p class="caption">${esc(t.time||'')} ${t.note?'· '+esc(t.note):''}</p></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="task-action-grid"><button class="primary" onclick="setTaskStatus('${rideId}',${di},${ti},'done')">Done</button><button class="ghost" onclick="delayTask('${rideId}',${di},${ti})">Delay</button><button class="ghost" onclick="setTaskStatus('${rideId}',${di},${ti},'skipped')">Skip</button><button class="ghost" onclick="editRideTask('${rideId}',${di},${ti})">Edit</button><button class="danger" onclick="confirmDeleteRideTask('${rideId}',${di},${ti})">Delete</button></div>`)};
+window.taskMenu=(rideId,di,ti)=>{const t=rideById(rideId)?.days?.[di]?.tasks?.[ti];if(!t)return;modal(`<div class="modalhead"><div><div class="kicker">TIMELINE TASK</div><h3>${esc(t.title)}</h3><p class="caption">${esc(t.time||'')} ${t.note?'· '+esc(t.note):''}</p></div><button class="iconbtn" onclick="closeModal()">×</button></div><div class="task-action-grid"><button class="primary" onclick="setTaskStatus('${rideId}',${di},${ti},'done')">Done</button><button class="ghost" onclick="delayTask('${rideId}',${di},${ti})">Delay</button><button class="ghost" onclick="setTaskStatus('${rideId}',${di},${ti},'skipped')">Skip</button></div><div class="quiet-menu task-secondary"><button onclick="editRideTask('${rideId}',${di},${ti})"><span>✎</span><div><strong>Edit task</strong><small>Time, title and note</small></div></button><button class="destructive" onclick="confirmDeleteRideTask('${rideId}',${di},${ti})"><span>×</span><div><strong>Delete task</strong><small>Remove it from this timeline</small></div></button></div>`)};
 
-for(const name of ['saveNewRide','saveRideDay','saveRideTask','saveRoutePart','saveTaskDelay','setTaskStatus']){
-  const base=window[name];if(typeof base!=='function')continue;
-  window[name]=function(){const args=[...arguments],rideId=args[0];const out=base.apply(this,args);Promise.resolve(out).finally(()=>setTimeout(()=>{renderRidesPremium();if(rideId)refreshRideModeIfOpen(rideId)},0));return out};
-}
+for(const name of ['saveNewRide','saveRideDay','saveRideTask','saveRoutePart','saveTaskDelay','setTaskStatus']){const base=window[name];if(typeof base!=='function')continue;window[name]=function(){const args=[...arguments],rideId=args[0];const out=base.apply(this,args);Promise.resolve(out).finally(()=>setTimeout(()=>{renderRidesPremium();if(rideId)refreshRideModeIfOpen(rideId)},0));return out}}
 
-/* ---------- Keep premium pages applied after legacy renderer runs ---------- */
-const baseSetPage=window.setPage;
-window.setPage=function(page){const out=baseSetPage?.(page);setTimeout(()=>{if(page==='rides')renderRidesPremium();if(page==='bike')enhanceBikeDocuments();if(page==='more')updateConnectivity()},0);return out};
-function enhanceActivePage(){if(S().ui?.page==='rides')renderRidesPremium();if(S().ui?.page==='bike')enhanceBikeDocuments();}
-const ridesRoot=$('#rides'),bikeRoot=$('#bike');
-if(ridesRoot)new MutationObserver(()=>{if(ridesRoot.classList.contains('active')&&!ridesRoot.querySelector('.rh-premium-rides'))queueMicrotask(renderRidesPremium)}).observe(ridesRoot,{childList:true});
-if(bikeRoot)new MutationObserver(()=>{if(bikeRoot.classList.contains('active')&&!bikeRoot.querySelector('.rh-premium-docs'))queueMicrotask(enhanceBikeDocuments)}).observe(bikeRoot,{childList:true});
+/* ---------- Premium page routing ---------- */
+function renderPagePremium(page){if(page==='rides')renderRidesPremium();if(page==='gear')renderGearPremium();if(page==='bike')enhanceBikeDocuments();if(page==='more')updateConnectivity()}
+function renderActivePremium(){renderPagePremium(S().ui?.page||'home')}
+window.setPage=function(page){
+  const wasPage=S().ui?.page||'home',wasRide=S().ui?.rideId||'';
+  if(page!=='rides')S().ui.rideId='';
+  else if(wasPage!=='rides')S().ui.rideId='';
+  const out=baseSetPage?.(page);S().ui.page=page;persist();renderPagePremium(page);
+  if(!restoringHistory&&(page!==wasPage||wasRide))pushNav({page,rideId:S().ui.rideId||'',rideMode:false,modal:false});
+  return out;
+};
 
-setTimeout(()=>{updateConnectivity();enhanceActivePage()},50);
+updateConnectivity();
+setTimeout(renderActivePremium,0);
 })();
