@@ -66,7 +66,7 @@ jobs:
           for(const x of ['openRideMenu','editRide','confirmDeleteRide','openRouteMenu','editRoutePart','confirmDeleteRoutePart','editRideTask','confirmDeleteRideTask']) if(!premium.includes(`window.${x}`)) throw new Error(`quiet ride editing control missing: ${x}`);
           for(const x of ["name:'Registration / RC'","name:'PUC / emissions'","name:'Purchase invoice'","name:'Warranty'","name:'Service invoices'",'+ Add custom document']) if(!premium.includes(x)) throw new Error(`document vault item missing: ${x}`);
           if(!premium.includes('syncAllLocalFilesToDrive')||!premium.includes('Cross-device sync')) throw new Error('Drive cross-device UX missing');
-          if(!drive.includes('riderHubDriveRemembered')||!drive.includes('riderHubEnsureDriveAccess')||!drive.includes('desired:true')||!drive.includes('desired:false')) throw new Error('persistent Drive preference missing');
+          for(const x of ['writeStateDrive','profile.drive','riderHubDriveRemembered','riderHubEnsureDriveAccess','riderHubReconnectDrive','desired:true','desired:false']) if(!drive.includes(x)) throw new Error(`persistent account Drive behavior missing: ${x}`);
           if(!finish.includes('Google Drive connected')||!finish.includes('Disconnect Drive')||!finish.includes('openPrivateDocumentFromDrive')) throw new Error('persistent Drive UI missing');
           if(!finish.includes('openRiderHubStatus')||!finish.includes('Offline cache')||!finish.includes('Saved offline')) throw new Error('Rider Hub health UX missing');
           if(!finish.includes('resumeRideModeId')||!finish.includes('Continue where you left off')) throw new Error('resume context missing');
