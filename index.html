@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="auth-pending">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -14,13 +14,17 @@
 <link rel="icon" href="icon-192.svg" type="image/svg+xml">
 <link rel="stylesheet" href="stable-app.css">
 <link rel="stylesheet" href="stable-compat.css">
+<link rel="stylesheet" href="premium-polish.css">
 <title>Rider Hub</title>
 </head>
 <body>
 <div class="app">
   <header class="header">
     <div class="brand"><div class="mark">RH</div><div><div class="brand-title">RIDER HUB</div><div class="brand-sub">MOTORCYCLE OS</div></div></div>
-    <div class="header-actions"><span class="sync-dot" title="Local copy ready"></span><button class="iconbtn" onclick="openAccount()" aria-label="My Account">◉</button></div>
+    <div class="header-actions">
+      <button id="networkStatus" class="network-status online" onclick="openConnectivityInfo()" aria-label="Online" title="Online"><span class="status-core"></span></button>
+      <button class="iconbtn bellbtn" onclick="openNotifications()" aria-label="Notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
   </header>
   <main>
     <section id="home" class="page active"></section>
@@ -47,6 +51,7 @@
 <script src="stable-app.js"></script>
 <script src="cloud-drive-v2.js"></script>
 <script src="stable-ui-fixes.js"></script>
+<script src="premium-polish.js"></script>
 <script type="module" src="stable-auth.js"></script>
 <script>if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{})}</script>
 </body>
