@@ -16,6 +16,7 @@ jobs:
       - name: Check stable browser scripts
         run: |
           node --check stable-app.js
+          node --check stable-ui-fixes.js
           node --check motorcycle-catalog.js
           node --check manual-reader.js
           node --check cloud-drive-v2.js
@@ -32,11 +33,12 @@ jobs:
           const fs=require('fs');
           const html=fs.readFileSync('index.html','utf8');
           const app=fs.readFileSync('stable-app.js','utf8');
+          const ui=fs.readFileSync('stable-ui-fixes.js','utf8');
           const auth=fs.readFileSync('stable-auth.js','utf8');
           const sw=fs.readFileSync('sw.js','utf8');
           const rules=fs.readFileSync('firestore.rules','utf8');
           const manifest=JSON.parse(fs.readFileSync('manifest.webmanifest','utf8'));
-          const required=['stable-app.css','stable-compat.css','firebase-config.js','motorcycle-catalog.js','manual-reader.js','stable-app.js','cloud-drive-v2.js','stable-auth.js'];
+          const required=['stable-app.css','stable-compat.css','firebase-config.js','motorcycle-catalog.js','manual-reader.js','stable-app.js','cloud-drive-v2.js','stable-ui-fixes.js','stable-auth.js'];
           for(const f of required) if(!html.includes(f)) throw new Error(`${f} missing from stable index`);
           const forbidden=['phase2e-restore.js','phase3-live.js','approved-changes.js','confirmed-features.js','ride-mode-v2.js','v32-fixes.js','firebase-auth.js'];
           for(const f of forbidden) if(html.includes(f)) throw new Error(`legacy runtime still loaded: ${f}`);
@@ -51,7 +53,8 @@ jobs:
           if(!app.includes("Other manufacturers…")||!app.includes("Upload Owner's Manual")||!app.includes('Skip / do later')) throw new Error('bike/manual setup flow missing');
           if(!app.includes('Add custom document')||!app.includes('Rider licence')||!app.includes('Insurance')) throw new Error('document vault contract missing');
           if(!app.includes("purple|violet|lavender")||!app.includes("red|crimson|maroon")) throw new Error('single accent mapping missing');
-          if(!sw.includes("riderhub-stable-v34")) throw new Error('stable service-worker cache missing');
+          for(const text of ['Drive connected','Jayrut Gajjar','@jayrut.raw','@jayrut-raw','jayrut.raw@gmail.com']) if(!ui.includes(text)) throw new Error(`stable UI detail missing: ${text}`);
+          if(!sw.includes("riderhub-stable-v35")||!sw.includes('stable-ui-fixes.js')) throw new Error('stable service-worker cache missing');
           if(manifest.orientation!=='any') throw new Error('desktop-friendly PWA orientation missing');
           NODE
 
