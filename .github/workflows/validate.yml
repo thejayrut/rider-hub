@@ -23,6 +23,9 @@ jobs:
           cp stable-auth.js /tmp/stable-auth.mjs
           node --check /tmp/stable-auth.mjs
 
+      - name: Run stable behavior smoke test
+        run: node tests/stable-smoke.js
+
       - name: Validate stable runtime contract
         run: |
           node - <<'NODE'
@@ -33,7 +36,7 @@ jobs:
           const sw=fs.readFileSync('sw.js','utf8');
           const rules=fs.readFileSync('firestore.rules','utf8');
           const manifest=JSON.parse(fs.readFileSync('manifest.webmanifest','utf8'));
-          const required=['stable-app.css','firebase-config.js','motorcycle-catalog.js','manual-reader.js','stable-app.js','cloud-drive-v2.js','stable-auth.js'];
+          const required=['stable-app.css','stable-compat.css','firebase-config.js','motorcycle-catalog.js','manual-reader.js','stable-app.js','cloud-drive-v2.js','stable-auth.js'];
           for(const f of required) if(!html.includes(f)) throw new Error(`${f} missing from stable index`);
           const forbidden=['phase2e-restore.js','phase3-live.js','approved-changes.js','confirmed-features.js','ride-mode-v2.js','v32-fixes.js','firebase-auth.js'];
           for(const f of forbidden) if(html.includes(f)) throw new Error(`legacy runtime still loaded: ${f}`);
