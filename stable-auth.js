@@ -4,7 +4,7 @@ import {getFirestore,doc,getDoc,setDoc,deleteDoc,serverTimestamp} from 'https://
 const CFG=window.RIDER_HUB_FIREBASE_CONFIG;
 const ALLOWED=String(window.riderHubAllowedEmail?.()||'jayrut2006@gmail.com').toLowerCase();
 const app=initializeApp(CFG),auth=getAuth(app),db=getFirestore(app);
-let current=null,revision=0,saving=false,pending=null;
+let current=null,revision=0,saving=false,pending=null,authResolved=false;
 const provider=()=>{const p=new GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});return p};
 const stateRef=uid=>doc(db,'users',uid,'riderhub','state');
 const profileRef=uid=>doc(db,'users',uid);
@@ -14,6 +14,7 @@ async function enter(user){const email=String(user?.email||'').toLowerCase();if(
 async function saveNow(state){if(!current||!state||saving)return false;saving=true;try{revision=Math.max(0,revision)+1;await setDoc(stateRef(current.uid),{schema:4,revision,clientId:'stable-'+current.uid.slice(0,12),state,clientUpdatedAt:Date.now(),updatedAt:serverTimestamp()});return true}catch(e){console.warn('Rider Hub cloud save unavailable',e);revision=Math.max(0,revision-1);return false}finally{saving=false;if(pending){const x=pending;pending=null;setTimeout(()=>saveNow(x),100)}}}
 window.riderHubCloudSave=state=>{if(saving){pending=state;return}saveNow(state)};
 window.riderHubFirebaseUser=()=>current||auth.currentUser||null;
+window.riderHubAuthResolved=()=>authResolved;
 window.riderHubLogin=async()=>{
   try{
     await signInWithPopup(auth,provider());
@@ -26,9 +27,18 @@ window.riderHubLogin=async()=>{
     window.toast?.(`Google sign-in failed${code?` · ${code.replace('auth/','')}`:''}`);
   }
 };
-window.riderHubLogout=async()=>{try{if(current)await saveNow(window.riderHubExportState?.());await signOut(auth)}catch(e){console.warn(e)}current=null;window.riderHubSignedOut?.()};
+window.riderHubLogout=async()=>{try{if(current)await saveNow(window.riderHubExportState?.());await signOut(auth)}catch(e){console.warn(e)}current=null};
 async function clearCloud(user){await deleteDoc(stateRef(user.uid)).catch(()=>{});await deleteDoc(profileRef(user.uid)).catch(()=>{})}
 async function reauth(user){const p=provider();p.setCustomParameters({prompt:'select_account',login_hint:user.email||''});await reauthenticateWithPopup(user,p)}
-window.riderHubDeleteAccount=async()=>{const user=auth.currentUser;if(!user)return window.toast?.('Sign in again first');try{window.toast?.('Deleting Rider Hub account…');if(window.cloudSyncConnected?.())await window.riderHubDeleteDriveData?.().catch(()=>{});await window.riderHubDeleteLocalAccountFiles?.(user.uid).catch(()=>{});await clearCloud(user);try{await deleteUser(user)}catch(e){if(String(e?.code||'').includes('requires-recent-login')){await reauth(user);await deleteUser(auth.currentUser)}else throw e}localStorage.removeItem('riderhub_stable_v1');current=null;window.riderHubSignedOut?.();window.toast?.('Rider Hub account deleted')}catch(e){console.error('Account deletion failed',e);window.toast?.(String(e?.code||'').includes('requires-recent-login')?'Sign in again, then retry account deletion':e?.message||'Could not delete account')}};
+window.riderHubDeleteAccount=async()=>{const user=auth.currentUser;if(!user)return window.toast?.('Sign in again first');try{window.toast?.('Deleting Rider Hub account…');if(window.cloudSyncConnected?.())await window.riderHubDeleteDriveData?.().catch(()=>{});await window.riderHubDeleteLocalAccountFiles?.(user.uid).catch(()=>{});await clearCloud(user);try{await deleteUser(user)}catch(e){if(String(e?.code||'').includes('requires-recent-login')){await reauth(user);await deleteUser(auth.currentUser)}else throw e}localStorage.removeItem('riderhub_stable_v1');localStorage.removeItem('riderhub_onboarding_seen_v1');current=null;window.toast?.('Rider Hub account deleted')}catch(e){console.error('Account deletion failed',e);window.toast?.(String(e?.code||'').includes('requires-recent-login')?'Sign in again, then retry account deletion':e?.message||'Could not delete account')}};
+window.riderHubAuthBooting?.();
 await setPersistence(auth,browserLocalPersistence);
-onAuthStateChanged(auth,user=>{if(user)enter(user);else{current=null;window.riderHubFirebaseUser=()=>null;window.riderHubSignedOut?.()}});
+onAuthStateChanged(auth,async user=>{
+  try{
+    if(user)await enter(user);
+    else{current=null;window.riderHubFirebaseUser=()=>null;window.riderHubSignedOut?.()}
+  }finally{
+    authResolved=true;
+    window.riderHubAuthReady?.(user||null);
+  }
+});
