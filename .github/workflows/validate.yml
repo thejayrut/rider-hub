@@ -42,6 +42,7 @@ jobs:
           for(const f of forbidden) if(html.includes(f)) throw new Error(`legacy runtime still loaded: ${f}`);
           if(!app.includes("ALLOWED_EMAIL='jayrut2006@gmail.com'")) throw new Error('private beta allowlist missing');
           if(!auth.includes("'jayrut2006@gmail.com'")) throw new Error('auth allowlist missing');
+          if(!auth.includes('signInWithPopup(auth,provider())')||auth.includes('signInWithRedirect')||auth.includes('getRedirectResult')) throw new Error('stable Google sign-in must use direct popup flow');
           if(!rules.includes("request.auth.token.email == 'jayrut2006@gmail.com'")) throw new Error('Firestore allowlist missing');
           if(!app.includes('Array.from({length:count}')||!app.includes('r.days.map')) throw new Error('dynamic ride-day model missing');
           if(!app.includes('function autoAdvance')||!app.includes('r.selectedDay=di+1')) throw new Error('automatic day advancing missing');
@@ -50,7 +51,7 @@ jobs:
           if(!app.includes("Other manufacturers…")||!app.includes("Upload Owner's Manual")||!app.includes('Skip / do later')) throw new Error('bike/manual setup flow missing');
           if(!app.includes('Add custom document')||!app.includes('Rider licence')||!app.includes('Insurance')) throw new Error('document vault contract missing');
           if(!app.includes("purple|violet|lavender")||!app.includes("red|crimson|maroon")) throw new Error('single accent mapping missing');
-          if(!sw.includes("riderhub-stable-v33")) throw new Error('stable service-worker cache missing');
+          if(!sw.includes("riderhub-stable-v34")) throw new Error('stable service-worker cache missing');
           if(manifest.orientation!=='any') throw new Error('desktop-friendly PWA orientation missing');
           NODE
 
