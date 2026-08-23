@@ -3,101 +3,48 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#08090a">
+<meta name="theme-color" content="#070809">
 <meta name="color-scheme" content="dark">
-<meta name="description" content="Rider Hub — personal motorcycle operating system">
+<meta name="description" content="Rider Hub — your motorcycle companion">
 <meta name="application-name" content="Rider Hub">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<script>
-(()=>{
-  const root=document.documentElement;root.classList.add('rh-preboot');
-  try{
-    const session=JSON.parse(localStorage.getItem('riderhub_auth_session_v1')||'null');
-    const uid=session?.provider==='firebase'&&session?.uid?session.uid:'';
-    const key=uid?'riderhub_public_state_v1_'+encodeURIComponent(uid):'';
-    const saved=key?JSON.parse(localStorage.getItem(key)||'null'):null;
-    const c=saved?.ui?.accentColor;
-    if(/^#[0-9a-f]{6}$/i.test(String(c||''))){
-      const n=parseInt(c.slice(1),16),r=n>>16,g=(n>>8)&255,b=n&255;
-      root.style.setProperty('--ember',c);root.style.setProperty('--ember2',c);root.style.setProperty('--soft',`rgba(${r},${g},${b},.11)`);root.style.setProperty('--rh-accent',c);
-    }
-  }catch{}
-  setTimeout(()=>root.classList.remove('rh-preboot'),1600);
-})();
-</script>
-<style>html.rh-preboot body{visibility:hidden}</style>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.svg" type="image/svg+xml">
-<link rel="stylesheet" href="styles.css">
-<link rel="stylesheet" href="phase2e-restore.css">
-<link rel="stylesheet" href="phase3-live.css">
-<link rel="stylesheet" href="phase3-account.css">
-<link rel="stylesheet" href="firebase-account.css">
-<link rel="stylesheet" href="approved-changes.css">
-<link rel="stylesheet" href="confirmed-features.css">
-<link rel="stylesheet" href="final-polish.css">
-<link rel="stylesheet" href="v32-ui.css">
+<link rel="stylesheet" href="stable-app.css">
 <title>Rider Hub</title>
 </head>
 <body>
-<div class="topo"></div>
-<div class="shell">
-<header class="header">
-  <div class="brand"><div class="brandmark" title="My Account">RH</div><div><div class="brandname">RIDER HUB</div><div class="sub">MOTORCYCLE OS</div></div></div>
-  <div class="header-actions"><button id="rhSyncChip" class="rh-sync-chip" data-state="loading" onclick="openMyAccount()" aria-live="polite" title="Rider Hub sync status" hidden>STARTING</button><button id="undoBtn" class="round" onclick="undo()" title="Undo">↶</button><button class="round" onclick="openNotifications()" title="Notifications" aria-label="Notifications"><svg class="rh-bell-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg></button></div>
-</header>
-<main>
-  <section id="home" class="page active"></section>
-  <section id="bike" class="page"></section>
-  <section id="rides" class="page"></section>
-  <section id="gear" class="page"></section>
-  <section id="docs" class="page"></section>
-  <section id="more" class="page"></section>
-</main>
+<div class="app">
+  <header class="header">
+    <div class="brand"><div class="mark">RH</div><div><div class="brand-title">RIDER HUB</div><div class="brand-sub">MOTORCYCLE OS</div></div></div>
+    <div class="header-actions"><span class="sync-dot" title="Local copy ready"></span><button class="iconbtn" onclick="openAccount()" aria-label="My Account">◉</button></div>
+  </header>
+  <main>
+    <section id="home" class="page active"></section>
+    <section id="bike" class="page"></section>
+    <section id="rides" class="page"></section>
+    <section id="gear" class="page"></section>
+    <section id="more" class="page"></section>
+  </main>
+  <nav class="bottomnav">
+    <button class="navbtn active" data-page="home" onclick="setPage('home')"><b>⌂</b><span>Home</span></button>
+    <button class="navbtn" data-page="bike" onclick="setPage('bike')"><b>◇</b><span>Bike</span></button>
+    <button class="ridebtn" onclick="setPage('rides')">↗</button>
+    <button class="navbtn" data-page="gear" onclick="setPage('gear')"><b>▣</b><span>Gear</span></button>
+    <button class="navbtn" data-page="more" onclick="setPage('more')"><b>•••</b><span>More</span></button>
+  </nav>
 </div>
-<nav id="nav" class="bottomnav">
-  <button class="navbtn active" data-page="home"><b>⌂</b>Home</button>
-  <button class="navbtn" data-page="bike"><b>◇</b>Bike</button>
-  <button class="ridebtn" data-page="rides" onclick="setPage('rides')">↗</button>
-  <button class="navbtn" data-page="gear"><b>▣</b>Gear</button>
-  <button class="navbtn" data-page="more"><b>•••</b>More</button>
-</nav>
 <div id="modalWrap" class="modalwrap"><div id="modal" class="modal"></div></div>
 <div id="rideMode" class="rideMode"><div id="rideModeInner" class="rideModeInner"></div></div>
 <div id="toast" class="toast"></div>
-<input id="importFile" type="file" accept="application/json" hidden>
-<script src="app.js"></script>
-<script src="enhancements.js"></script>
-<script src="phase2e-restore.js"></script>
-<script src="maps-demo.js"></script>
-<script src="cloud-drive-v2.js"></script>
-<script src="phase3-live.js"></script>
-<script src="phase3-account.js"></script>
-<script src="phase3-public.js"></script>
-<script src="state-bridge.js"></script>
-<script src="stability-hotfix.js"></script>
-<script src="firebase-ui-bridge.js"></script>
-<script src="motorcycle-catalog.js"></script>
-<script src="auth-transition-guard.js"></script>
-<script src="approved-changes.js"></script>
-<script src="approved-runtime-fixes.js"></script>
-<script src="manual-reader.js"></script>
-<script src="confirmed-features.js"></script>
-<script src="manual-reader-v2.js"></script>
-<script src="ride-pdf-importer.js"></script>
-<script src="ride-mode-v2.js"></script>
-<script src="ride-mode-polish.js"></script>
-<script src="final-polish.js"></script>
-<script src="v31-undo-guards.js"></script>
-<script src="manual-reader-v3.js"></script>
-<script src="v32-fixes.js"></script>
-<script src="v32-version.js"></script>
-<script src="v32-fast-start.js"></script>
-<script src="auth-flow-controller.js"></script>
+<div id="authShell" class="auth-shell"><div class="auth-inner"><div class="auth-brand"><div class="mark">RH</div><div><div class="brand-title">RIDER HUB</div><div class="brand-sub">MOTORCYCLE OS</div></div></div><div id="authStage" class="auth-stage"></div></div></div>
 <script src="firebase-config.js"></script>
-<script type="module" src="firebase-auth.js"></script>
-<script type="module" src="firebase-account-delete.js"></script>
+<script src="motorcycle-catalog.js"></script>
+<script src="manual-reader.js"></script>
+<script src="stable-app.js"></script>
+<script src="cloud-drive-v2.js"></script>
+<script type="module" src="stable-auth.js"></script>
 </body>
 </html>
