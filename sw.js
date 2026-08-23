@@ -1,5 +1,5 @@
-const CACHE='riderhub-stable-v36';
-const ASSETS=['./','./index.html','./stable-app.css','./stable-compat.css','./premium-polish.css','./stable-app.js','./stable-auth.js','./stable-ui-fixes.js','./premium-polish.js','./firebase-config.js','./motorcycle-catalog.js','./manual-reader.js','./cloud-drive-v2.js','./manifest.webmanifest','./icon-192.svg','./icon-512.svg','./icon-maskable.svg'];
+const CACHE='riderhub-stable-v37';
+const ASSETS=['./','./index.html','./stable-app.css','./stable-compat.css','./premium-polish.css','./stable-app.js','./stable-auth.js','./premium-polish.js','./account-scope-guard.js','./firebase-config.js','./motorcycle-catalog.js','./manual-reader.js','./cloud-drive-v2.js','./manifest.webmanifest','./icon-192.svg','./icon-512.svg','./icon-maskable.svg'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{
