@@ -14,8 +14,16 @@ async function saveNow(state){if(!current||!state||saving)return false;saving=tr
 window.riderHubCloudSave=state=>{if(saving){pending=state;return}saveNow(state)};
 window.riderHubFirebaseUser=()=>current||auth.currentUser||null;
 window.riderHubAuthResolved=()=>authResolved;
-async function hydrateCloud(user){try{await writeProfile(user);const cloud=await loadState(user);if(cloud)window.riderHubSetUser?.(user,cloud);else await saveNow(window.riderHubExportState?.())}catch(e){console.warn('Rider Hub cloud hydration unavailable',e)}}
-function enterFast(user){const email=String(user?.email||'').toLowerCase();if(email!==ALLOWED)return false;current=user;window.riderHubFirebaseUser=()=>current;window.riderHubSetUser?.(user,null);authResolved=true;window.riderHubAuthReady?.(user);setTimeout(()=>hydrateCloud(user),0);return true}
+const stateJson=()=>{try{return JSON.stringify(window.riderHubExportState?.()||null)}catch{return''}};
+async function hydrateCloud(user,localAtStart){
+  try{
+    await writeProfile(user);
+    const cloud=await loadState(user),localNow=stateJson();
+    if(localNow&&localAtStart&&localNow!==localAtStart){await saveNow(window.riderHubExportState?.());return}
+    if(cloud)window.riderHubSetUser?.(user,cloud);else await saveNow(window.riderHubExportState?.());
+  }catch(e){console.warn('Rider Hub cloud hydration unavailable',e)}
+}
+function enterFast(user){const email=String(user?.email||'').toLowerCase();if(email!==ALLOWED)return false;current=user;window.riderHubFirebaseUser=()=>current;window.riderHubSetUser?.(user,null);authResolved=true;window.riderHubAuthReady?.(user);const localAtStart=stateJson();setTimeout(()=>hydrateCloud(user,localAtStart),0);return true}
 window.riderHubLogin=async()=>{try{await signInWithPopup(auth,provider())}catch(e){console.error('Rider Hub sign-in failed',e);const code=String(e?.code||'');if(code.includes('popup-closed')||code.includes('cancelled-popup'))return window.toast?.('Google sign-in was cancelled');if(code.includes('popup-blocked'))return window.toast?.('Allow pop-ups for Rider Hub, then try again');if(code.includes('unauthorized-domain'))return window.toast?.('This Rider Hub domain is not authorized for Google sign-in');window.toast?.(`Google sign-in failed${code?` · ${code.replace('auth/','')}`:''}`)}};
 window.riderHubLogout=async()=>{try{if(current)saveNow(window.riderHubExportState?.());await signOut(auth)}catch(e){console.warn(e)}current=null};
 async function clearCloud(user){await deleteDoc(stateRef(user.uid)).catch(()=>{});await deleteDoc(profileRef(user.uid)).catch(()=>{})}
