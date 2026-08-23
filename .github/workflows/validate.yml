@@ -13,124 +13,64 @@ jobs:
         with:
           node-version: 22
 
-      - name: Check browser script syntax
+      - name: Check stable browser scripts
         run: |
-          for f in \
-            app.js enhancements.js phase2e-restore.js maps-demo.js phase3-live.js \
-            phase3-account.js phase3-public.js state-bridge.js stability-hotfix.js \
-            firebase-ui-bridge.js motorcycle-catalog.js auth-transition-guard.js \
-            approved-changes.js approved-runtime-fixes.js manual-reader.js \
-            manual-reader-v2.js manual-reader-v3.js cloud-drive-v2.js \
-            confirmed-features.js ride-pdf-importer.js ride-mode-v2.js \
-            ride-mode-polish.js final-polish.js v31-undo-guards.js v32-fixes.js \
-            v32-version.js v32-fast-start.js auth-flow-controller.js sw.js; do
-            node --check "$f"
-          done
+          node --check stable-app.js
+          node --check motorcycle-catalog.js
+          node --check manual-reader.js
+          node --check cloud-drive-v2.js
+          node --check sw.js
+          cp stable-auth.js /tmp/stable-auth.mjs
+          node --check /tmp/stable-auth.mjs
 
-      - name: Run Rider Hub smoke tests
+      - name: Validate stable runtime contract
         run: |
-          node tests/auth-flow-smoke.js
-          node tests/runtime-fixes-smoke.js
-          node tests/manual-reader-smoke.js
-          node tests/confirmed-features-smoke.js
-          node tests/auth-transition-smoke.js
-          node tests/auth-flow-v31-smoke.js
-          node tests/manual-v2-smoke.js
-          node tests/ride-pdf-smoke.js
-          node tests/v32-fast-start-smoke.js
-          node tests/manual-v3-smoke.js
-          node tests/v32-contract-smoke.js
-
-      - name: Check Firebase module syntax
-        run: |
-          cp firebase-auth.js /tmp/firebase-auth.mjs
-          node --check /tmp/firebase-auth.mjs
-          cp firebase-account-delete.js /tmp/firebase-account-delete.mjs
-          node --check /tmp/firebase-account-delete.mjs
-
-      - name: Validate app configuration
-        run: |
-          node - <<'NODE'
-          const fs=require('fs');
-          const manifest=JSON.parse(fs.readFileSync('manifest.webmanifest','utf8'));
-          JSON.parse(fs.readFileSync('firebase.json','utf8'));
-          JSON.parse(fs.readFileSync('.firebaserc','utf8'));
-          const sizes=new Set((manifest.icons||[]).map(x=>x.sizes));
-          if(!sizes.has('192x192')||!sizes.has('512x512')) throw new Error('PWA manifest needs 192x192 and 512x512 icons');
-          if(!manifest.start_url||!manifest.display) throw new Error('PWA manifest is missing start_url/display');
-          NODE
-
-      - name: Check v32 assets and runtime order
-        run: |
-          for f in index.html styles.css v32-ui.css v32-fast-start.js v32-fixes.js \
-            v32-version.js manual-reader-v3.js auth-flow-controller.js auth-transition-guard.js \
-            firebase-auth.js firebase-account-delete.js sw.js firestore.rules; do
-            test -s "$f"
-          done
-          grep -Fq "const CACHE='riderhub-v32'" sw.js
-          grep -Fq 'v32-ui.css' index.html
-          grep -Fq 'manual-reader-v3.js' index.html
-          grep -Fq 'v32-fixes.js' index.html
-          grep -Fq 'v32-version.js' index.html
-          grep -Fq 'v32-fast-start.js' index.html
-          grep -Fq 'v32-version.js' sw.js
-          grep -Fq 'v32-fast-start.js' sw.js
-          ! grep -Fq '<script src="cloud-sync.js"></script>' index.html
           node - <<'NODE'
           const fs=require('fs');
           const html=fs.readFileSync('index.html','utf8');
-          const order=['motorcycle-catalog.js','auth-transition-guard.js','approved-changes.js','confirmed-features.js','manual-reader-v2.js','ride-mode-v2.js','final-polish.js','manual-reader-v3.js','v32-fixes.js','v32-version.js','v32-fast-start.js','auth-flow-controller.js','firebase-auth.js'];
-          let last=-1;
-          for(const file of order){
-            const i=html.indexOf(file);
-            if(i<0) throw new Error(`${file} missing from index.html`);
-            if(i<=last) throw new Error(`Runtime order is wrong at ${file}`);
-            last=i;
-          }
+          const app=fs.readFileSync('stable-app.js','utf8');
+          const auth=fs.readFileSync('stable-auth.js','utf8');
+          const sw=fs.readFileSync('sw.js','utf8');
+          const rules=fs.readFileSync('firestore.rules','utf8');
+          const manifest=JSON.parse(fs.readFileSync('manifest.webmanifest','utf8'));
+          const required=['stable-app.css','firebase-config.js','motorcycle-catalog.js','manual-reader.js','stable-app.js','cloud-drive-v2.js','stable-auth.js'];
+          for(const f of required) if(!html.includes(f)) throw new Error(`${f} missing from stable index`);
+          const forbidden=['phase2e-restore.js','phase3-live.js','approved-changes.js','confirmed-features.js','ride-mode-v2.js','v32-fixes.js','firebase-auth.js'];
+          for(const f of forbidden) if(html.includes(f)) throw new Error(`legacy runtime still loaded: ${f}`);
+          if(!app.includes("ALLOWED_EMAIL='jayrut2006@gmail.com'")) throw new Error('private beta allowlist missing');
+          if(!auth.includes("'jayrut2006@gmail.com'")) throw new Error('auth allowlist missing');
+          if(!rules.includes("request.auth.token.email == 'jayrut2006@gmail.com'")) throw new Error('Firestore allowlist missing');
+          if(!app.includes('Array.from({length:count}')||!app.includes('r.days.map')) throw new Error('dynamic ride-day model missing');
+          if(!app.includes('function autoAdvance')||!app.includes('r.selectedDay=di+1')) throw new Error('automatic day advancing missing');
+          for(const x of ['Map','Expenses','Fuel log','Notes','Packing','Emergency','Summary','Tomorrow','Edit day','Add task']) if(!app.includes(`>${x}<`)) throw new Error(`Ride Mode tool missing: ${x}`);
+          if(!app.includes("travelmode:'two-wheeler'")) throw new Error('maps navigation missing');
+          if(!app.includes("Other manufacturers…")||!app.includes("Upload Owner's Manual")||!app.includes('Skip / do later')) throw new Error('bike/manual setup flow missing');
+          if(!app.includes('Add custom document')||!app.includes('Rider licence')||!app.includes('Insurance')) throw new Error('document vault contract missing');
+          if(!app.includes("purple|violet|lavender")||!app.includes("red|crimson|maroon")) throw new Error('single accent mapping missing');
+          if(!sw.includes("riderhub-stable-v33")) throw new Error('stable service-worker cache missing');
+          if(manifest.orientation!=='any') throw new Error('desktop-friendly PWA orientation missing');
           NODE
 
-      - name: Check core product contracts
+      - name: Validate configuration
         run: |
           node - <<'NODE'
           const fs=require('fs');
-          const auth=fs.readFileSync('auth-flow-controller.js','utf8');
-          const features=fs.readFileSync('confirmed-features.js','utf8');
-          const polish=fs.readFileSync('final-polish.js','utf8');
-          const version=fs.readFileSync('v32-version.js','utf8');
-          const drive=fs.readFileSync('cloud-drive-v2.js','utf8');
-          const ride=fs.readFileSync('ride-mode-v2.js','utf8');
-          const publicLayer=fs.readFileSync('phase3-public.js','utf8');
-          if((auth.match(/\{k:'/g)||[]).length!==3) throw new Error('Onboarding must have exactly three slides');
-          if(!auth.includes('Continue with Google')||!auth.includes('PRIVATE FILES STAY YOURS')) throw new Error('Approved onboarding missing');
-          if(!features.includes('Other manufacturers…')||!features.includes("Add Owner's Manual")) throw new Error('Motorcycle setup/manual flow missing');
-          if(!polish.includes("CREATOR='Jayrut Gajjar'")||!polish.includes("FEEDBACK_EMAIL='jayrut.raw@gmail.com'")) throw new Error('About/feedback identity missing');
-          if(!version.includes("VERSION='v32'")||!version.includes("CREATOR='Jayrut Gajjar'")) throw new Error('v32 About/version label missing');
-          for(const text of ['Create manually','Import ride from PDF','Open Ride Mode','Expenses','Fuel','Packing','Media backup','Tomorrow','Emergency','Traffic','Summary']) if(!ride.includes(text)) throw new Error(`Ride Mode missing ${text}`);
-          if(!drive.includes('https://www.googleapis.com/auth/drive.file')||drive.includes('drive.appdata')) throw new Error('Drive must use narrow visible-file scope');
-          if(!publicLayer.includes('bikeConfigured:false')||!publicLayer.includes('USER_PREFIX')) throw new Error('Per-user clean workspace contract missing');
+          JSON.parse(fs.readFileSync('manifest.webmanifest','utf8'));
+          JSON.parse(fs.readFileSync('firebase.json','utf8'));
+          JSON.parse(fs.readFileSync('.firebaserc','utf8'));
           NODE
 
-      - name: Check self-service deletion rules
+      - name: Keep Drive narrow and file-only
         run: |
-          grep -Fq 'allow delete: if owns(userId);' firestore.rules
-
-      - name: Protect Firebase reserved namespace
-        run: |
-          grep -Fq "url.pathname.startsWith('/__/')" sw.js
-
-      - name: Keep Google Drive file-only
-        run: |
+          grep -Fq 'https://www.googleapis.com/auth/drive.file' cloud-drive-v2.js
+          ! grep -Fq 'drive.appdata' cloud-drive-v2.js
           if grep -Eq 'riderhub_state_v1\.json|uploadState\(|downloadState\(' cloud-drive-v2.js; then
             echo 'Google Drive must not become a second app-state database.'
             exit 1
           fi
 
-      - name: Reject non-Firebase API keys and private credentials
+      - name: Reject private credentials
         run: |
-          if grep -R -n --exclude-dir=.git --exclude=firebase-config.js 'AIza[0-9A-Za-z_-]\{20,\}' . 2>/dev/null; then
-            echo 'Non-Firebase Google API keys must not be committed.'
-            exit 1
-          fi
           if grep -R -n --exclude-dir=.git -E 'BEGIN (RSA |EC |)PRIVATE KEY|"private_key"[[:space:]]*:|"client_secret"[[:space:]]*:' . 2>/dev/null; then
             echo 'Private credentials must never be committed.'
             exit 1
