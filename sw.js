@@ -8,5 +8,5 @@ self.addEventListener('fetch',event=>{
  if(req.mode==='navigate'){
    event.respondWith(fetch(req).then(r=>{if(r.ok)caches.open(CACHE).then(c=>c.put('./index.html',r.clone())).catch(()=>{});return r}).catch(()=>caches.match('./index.html')));return;
  }
- event.respondWith(caches.match(req).then(cached=>cached||fetch(req).then(r=>{if(r.ok)caches.open(CACHE).then(c=>c.put(req,r.clone())).catch(()=>{});return r}));
+ event.respondWith(caches.match(req).then(cached=>cached||fetch(req).then(r=>{if(r.ok)caches.open(CACHE).then(c=>c.put(req,r.clone())).catch(()=>{});return r})));
 });
