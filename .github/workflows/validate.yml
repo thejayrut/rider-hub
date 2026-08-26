@@ -18,6 +18,7 @@ jobs:
           node --check stable-app.js
           node --check premium-polish.js
           node --check product-finish.js
+          node --check banswara-trip-live.js
           node --check account-scope-guard.js
           node --check motorcycle-catalog.js
           node --check manual-reader.js
@@ -37,14 +38,16 @@ jobs:
           const app=fs.readFileSync('stable-app.js','utf8');
           const premium=fs.readFileSync('premium-polish.js','utf8');
           const finish=fs.readFileSync('product-finish.js','utf8');
+          const trip=fs.readFileSync('banswara-trip-live.js','utf8');
           const css=fs.readFileSync('premium-polish.css','utf8');
+          const tripCss=fs.readFileSync('banswara-trip-live.css','utf8');
           const drive=fs.readFileSync('cloud-drive-v2.js','utf8');
           const guard=fs.readFileSync('account-scope-guard.js','utf8');
           const auth=fs.readFileSync('stable-auth.js','utf8');
           const sw=fs.readFileSync('sw.js','utf8');
           const rules=fs.readFileSync('firestore.rules','utf8');
           const manifest=JSON.parse(fs.readFileSync('manifest.webmanifest','utf8'));
-          const required=['stable-app.css','stable-compat.css','premium-polish.css','firebase-config.js','motorcycle-catalog.js','manual-reader.js','stable-app.js','cloud-drive-v2.js','premium-polish.js','account-scope-guard.js','product-finish.js','stable-auth.js'];
+          const required=['stable-app.css','stable-compat.css','premium-polish.css','banswara-trip-live.css','firebase-config.js','motorcycle-catalog.js','manual-reader.js','stable-app.js','cloud-drive-v2.js','premium-polish.js','account-scope-guard.js','product-finish.js','banswara-trip-live.js','stable-auth.js'];
           for(const f of required) if(!html.includes(f)) throw new Error(`${f} missing from stable index`);
           for(const f of ['stable-ui-fixes.js','phase2e-restore.js','phase3-live.js','approved-changes.js','confirmed-features.js','ride-mode-v2.js','v32-fixes.js','firebase-auth.js']) if(html.includes(f)) throw new Error(`legacy runtime still loaded: ${f}`);
           if(!app.includes("ALLOWED_EMAIL='jayrut2006@gmail.com'")) throw new Error('private beta allowlist missing');
@@ -74,7 +77,10 @@ jobs:
           if(!premium.includes('navigator.onLine')||!premium.includes('Works offline')||!premium.includes('Needs internet')) throw new Error('online/offline status UX missing');
           if(!app.includes("purple|violet|lavender")||!app.includes("red|crimson|maroon")) throw new Error('single accent mapping missing');
           for(const text of ['Jayrut Gajjar','@jayrut.raw','@jayrut-raw','jayrut.raw@gmail.com']) if(!premium.includes(text)) throw new Error(`about detail missing: ${text}`);
-          if(!sw.includes("riderhub-stable-v39")||!sw.includes('product-finish.js')||!sw.includes('premium-polish.js')||!sw.includes('account-scope-guard.js')) throw new Error('v39 service-worker cache missing');
+          for(const text of ['Banswara 3-Day Ronin Monsoon Adventure','Hotel Landmark, Banswara','Chacha Kota Actual Boating Point','Mahi Dam, Banswara Rajasthan','Singpura Waterfall','Jagmeru Hills','Arthuna','START RETURN','EXIT OFF-ROAD SECTION','Godhra–Dahod','Safety overrides the schedule.','Unknown flowing water = RED.','Rider Hub real-world test']) if(!trip.includes(text)) throw new Error(`final Banswara trip item missing: ${text}`);
+          for(const text of ['trip_banswara_guide','trip_banswara_hotel_booking','openBanswaraPrep','openSingpuraGoNoGo','openBanswaraOffroad','openBanswaraEmergency']) if(!trip.includes(text)) throw new Error(`Banswara live control missing: ${text}`);
+          if(!tripCss.includes('.banswara-trip-panel')||!tripCss.includes('.banswara-mode-strip')||!tripCss.includes('.banswara-task-badge')) throw new Error('Banswara live trip styling missing');
+          if(!sw.includes("riderhub-stable-v40")||!sw.includes('product-finish.js')||!sw.includes('premium-polish.js')||!sw.includes('account-scope-guard.js')||!sw.includes('banswara-trip-live.js')||!sw.includes('banswara-trip-live.css')) throw new Error('v40 service-worker cache missing');
           if(manifest.orientation!=='any') throw new Error('desktop-friendly PWA orientation missing');
           NODE
 
